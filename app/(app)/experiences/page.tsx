@@ -2,10 +2,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, BookOpen, Pencil, Trash2, Lock, Unlock } from "lucide-react"
+import { Plus, BookOpen, Pencil, Archive, Lock, Unlock } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 import { cn } from "@/lib/utils"
-import { localGetExperiences, localDeleteExperience, localUpdateExperience } from "@/lib/local-store"
+import { localArchiveExperience, localGetExperiences, localUpdateExperience } from "@/lib/local-store"
 import { AddExperienceModal } from "@/components/experiences/AddExperienceModal"
 import { ExperienceEditModal } from "@/components/experiences/ExperienceEditModal"
 import type { ExperienceEntry } from "@/types/experience"
@@ -23,12 +23,12 @@ function Chip({ label, variant = "muted" }: { label: string; variant?: "accent" 
 // ─── Experience card ──────────────────────────────────────────
 function ExperienceCard({
   exp,
-  onDelete,
+  onArchive,
   onEdit,
   onToggleLock,
 }: {
   exp: ExperienceEntry
-  onDelete: (id: string) => void
+  onArchive: (id: string) => void
   onEdit: (exp: ExperienceEntry) => void
   onToggleLock: (id: string) => void
 }) {
@@ -118,11 +118,11 @@ function ExperienceCard({
               : <Lock className="w-3.5 h-3.5" strokeWidth={1.5} />}
           </button>
           <button
-            onClick={() => onDelete(exp.id)}
-            className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-            title="删除"
+            onClick={() => onArchive(exp.id)}
+            className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            title="归档"
           >
-            <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+            <Archive className="w-3.5 h-3.5" strokeWidth={1.5} />
           </button>
         </div>
       </div>
@@ -141,8 +141,15 @@ export default function ExperiencesPage() {
     setExperiences(localGetExperiences())
   }, [])
 
-  function handleDelete(id: string) {
-    localDeleteExperience(id)
+  function handleArchive(id: string) {
+    const exp = experiences.find((e) => e.id === id)
+    if (!exp) return
+    const label = exp.project_name ?? exp.raw_input.slice(0, 24)
+    const confirmed = window.confirm(`确认归档「${label}」吗？\n\n归档后会从经历库列表中隐藏。如需恢复，可以在首页对话里输入「撤回归档」。`)
+    if (!confirmed) return
+    const archived = localArchiveExperience(id)
+    if (!archived) return
+    localStorage.setItem("narrative_last_archive", JSON.stringify({ type: "experience", id, previous: exp }))
     setExperiences((prev) => prev.filter((e) => e.id !== id))
   }
 
@@ -243,7 +250,7 @@ export default function ExperiencesPage() {
                 <ExperienceCard
                   key={exp.id}
                   exp={exp}
-                  onDelete={handleDelete}
+                  onArchive={handleArchive}
                   onEdit={setEditingExp}
                   onToggleLock={handleToggleLock}
                 />

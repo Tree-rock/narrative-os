@@ -24,6 +24,12 @@ function writeAll(entries: ExperienceEntry[]) {
 }
 
 export function localGetExperiences(): ExperienceEntry[] {
+  return readAll().filter((entry) => !entry.archived).sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  )
+}
+
+export function localGetAllExperiences(): ExperienceEntry[] {
   return readAll().sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
@@ -45,6 +51,10 @@ export function localCreateExperience(
 
 export function localDeleteExperience(id: string): void {
   writeAll(readAll().filter((e) => e.id !== id))
+}
+
+export function localArchiveExperience(id: string): ExperienceEntry | null {
+  return localUpdateExperience(id, { archived: true })
 }
 
 export function localUpdateExperience(

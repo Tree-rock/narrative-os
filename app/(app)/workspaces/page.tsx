@@ -6,7 +6,7 @@ import { Plus, Briefcase, Loader2, X, ChevronRight, Archive, Pencil, Lock, Unloc
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { wsGetAll, wsCreate, wsDelete, wsUpdate } from "@/lib/workspace-store"
+import { wsCreate, wsGetVisible, wsUpdate } from "@/lib/workspace-store"
 import { getSettings } from "@/lib/settings"
 import type { JDWorkspace, ParsedJD, WorkspaceStatus } from "@/types/workspace"
 
@@ -375,12 +375,12 @@ function EditWorkspaceModal({
 // ─── Workspace card ───────────────────────────────────────────
 function WorkspaceCard({
   ws,
-  onDelete,
+  onArchive,
   onEdit,
   onToggleLock,
 }: {
   ws: JDWorkspace
-  onDelete: (id: string) => void
+  onArchive: (id: string) => void
   onEdit: (ws: JDWorkspace) => void
   onToggleLock: (id: string) => void
 }) {
@@ -469,9 +469,9 @@ function WorkspaceCard({
                 : <Lock className="w-3.5 h-3.5" strokeWidth={1.5} />}
             </button>
             <button
-              onClick={() => onDelete(ws.id)}
-              title="删除"
-              className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              onClick={() => onArchive(ws.id)}
+              title="归档"
+              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
               <Archive className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
@@ -498,7 +498,7 @@ export default function WorkspacesPage() {
   const [editingWs, setEditingWs] = useState<JDWorkspace | null>(null)
 
   useEffect(() => {
-    setWorkspaces(wsGetAll())
+    setWorkspaces(wsGetVisible())
   }, [])
 
   function handleCreated(ws: JDWorkspace) {
@@ -508,8 +508,14 @@ export default function WorkspacesPage() {
     window.location.href = `/workspaces/${ws.id}`
   }
 
-  function handleDelete(id: string) {
-    wsDelete(id)
+  function handleArchive(id: string) {
+    const ws = workspaces.find((item) => item.id === id)
+    if (!ws) return
+    const confirmed = window.confirm(`确认归档「${ws.title}」吗？\n\n归档后会从 Workspace 列表中隐藏。如需恢复，可以在首页对话里输入「撤回归档」。`)
+    if (!confirmed) return
+    const updated = wsUpdate(id, { status: "archived" })
+    if (!updated) return
+    localStorage.setItem("narrative_last_archive", JSON.stringify({ type: "workspace", id, previous: ws }))
     setWorkspaces((prev) => prev.filter((w) => w.id !== id))
   }
 
@@ -555,7 +561,7 @@ export default function WorkspacesPage() {
                 <WorkspaceCard
                   key={ws.id}
                   ws={ws}
-                  onDelete={handleDelete}
+                  onArchive={handleArchive}
                   onEdit={setEditingWs}
                   onToggleLock={handleToggleLock}
                 />

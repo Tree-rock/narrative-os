@@ -33,6 +33,7 @@ export interface ExperienceEntry {
 
   // 用户控制
   locked?: boolean   // 锁定后不再被自动覆盖，手动编辑有效
+  archived?: boolean
 
   created_at: string
   updated_at: string

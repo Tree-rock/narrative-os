@@ -28,6 +28,10 @@ export function wsGetAll(): JDWorkspace[] {
   )
 }
 
+export function wsGetVisible(): JDWorkspace[] {
+  return wsGetAll().filter((w) => w.status !== "archived")
+}
+
 export function wsGet(id: string): JDWorkspace | null {
   return readAll().find((w) => w.id === id) ?? null
 }

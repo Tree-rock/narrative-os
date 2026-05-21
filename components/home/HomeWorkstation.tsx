@@ -6,8 +6,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { getSettings } from "@/lib/settings"
-import { localGetExperiences, localCreateExperience } from "@/lib/local-store"
-import { wsGetAll } from "@/lib/workspace-store"
+import { localCreateExperience, localGetExperiences, localUpdateExperience } from "@/lib/local-store"
+import { wsGetVisible, wsUpdate } from "@/lib/workspace-store"
 import { chatLoad, chatSave, chatClear } from "@/lib/chat-store"
 import { AddExperienceModal } from "@/components/experiences/AddExperienceModal"
 import { ResumeImportModal } from "@/components/home/ResumeImportModal"
@@ -42,6 +42,10 @@ type MentionTarget =
   | { kind: "experience"; id: string; label: string; description: string; entry: ExperienceEntry }
   | { kind: "jd"; id: string; label: string; description: string; workspace: JDWorkspace }
 
+type LastArchive =
+  | { type: "experience"; id: string; previous: ExperienceEntry }
+  | { type: "workspace"; id: string; previous: JDWorkspace }
+
 // ─── Helpers ─────────────────────────────────────────────────
 function genId() {
   return typeof crypto !== "undefined" && crypto.randomUUID
@@ -55,6 +59,18 @@ const WELCOME: ChatMessage = {
   content:
     "你好。我在这里帮你整理和表达自己的职业经历。\n\n直接告诉我任何经历——哪怕是碎片化的描述，我会帮你结构化并存入经历库。也可以上传简历或 JD，我们一起开始。",
   createdAt: new Date(),
+}
+
+function isArchiveUndoIntent(text: string) {
+  return /(撤回|恢复|取消|还原).{0,8}(归档|存档)|归档.{0,8}(撤回|恢复|取消|还原)/.test(text)
+}
+
+function shouldPromptExperienceSave(userText: string, assistantText: string) {
+  if (assistantText.includes("[EXPERIENCE_DETECTED]")) return true
+  if (userText.trim().length < 18) return false
+  const summarySignals = /(总结|整理|STAR|简历|bullet|经历库|项目|背景|行动|结果|成果|负责|提升|优化|落地|复盘)/
+  const assistantSignals = /(可以存入|建议存入|加入经历库|这段经历|这段项目|总结|STAR|简历|成果|行动|结果)/
+  return summarySignals.test(userText) && assistantSignals.test(assistantText)
 }
 
 // ─── Sub-components ──────────────────────────────────────────
@@ -146,7 +162,7 @@ export function HomeWorkstation() {
     const loadedExperiences = localGetExperiences()
     setAllExperiences(loadedExperiences)
     setExperiences(loadedExperiences.slice(0, 5))
-    setWorkspaces(wsGetAll())
+    setWorkspaces(wsGetVisible())
     const saved = chatLoad()
     if (saved.length > 0) setMessages([WELCOME, ...saved])
     setChatLoaded(true)
@@ -263,6 +279,78 @@ export function HomeWorkstation() {
     }
   }
 
+  function restoreLastArchive(userText: string) {
+    const userMsg: ChatMessage = {
+      id: genId(),
+      role: "user",
+      content: userText,
+      createdAt: new Date(),
+    }
+    const raw = localStorage.getItem("narrative_last_archive")
+    if (!raw) {
+      setMessages((prev) => [
+        ...prev,
+        userMsg,
+        {
+          id: genId(),
+          role: "assistant",
+          content: "我没有找到最近可撤回的归档记录。之后你在经历库或 JD 库点归档，我会记住最近一次，方便你在这里说「撤回归档」。",
+          createdAt: new Date(),
+        },
+      ])
+      return
+    }
+
+    try {
+      const last = JSON.parse(raw) as LastArchive
+      if (last.type === "experience") {
+        const restored = localUpdateExperience(last.id, { archived: false })
+        if (!restored) throw new Error("经历记录不存在")
+        setAllExperiences((prev) => [restored, ...prev.filter((entry) => entry.id !== restored.id)])
+        setExperiences((prev) => [restored, ...prev.filter((entry) => entry.id !== restored.id)].slice(0, 5))
+        localStorage.removeItem("narrative_last_archive")
+        setMessages((prev) => [
+          ...prev,
+          userMsg,
+          {
+            id: genId(),
+            role: "assistant",
+            content: `已撤回归档，恢复经历「${restored.project_name ?? restored.raw_input.slice(0, 24)}」。`,
+            createdAt: new Date(),
+          },
+        ])
+        return
+      }
+
+      const restoredStatus = last.previous.status === "archived" ? "active" : last.previous.status
+      const restored = wsUpdate(last.id, { status: restoredStatus })
+      if (!restored) throw new Error("JD 记录不存在")
+      setWorkspaces(wsGetVisible())
+      localStorage.removeItem("narrative_last_archive")
+      setMessages((prev) => [
+        ...prev,
+        userMsg,
+        {
+          id: genId(),
+          role: "assistant",
+          content: `已撤回归档，恢复 JD「${restored.title}」。`,
+          createdAt: new Date(),
+        },
+      ])
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        userMsg,
+        {
+          id: genId(),
+          role: "assistant",
+          content: "撤回失败了：最近归档记录已经不存在或格式不完整。你可以去对应库里重新添加这条内容。",
+          createdAt: new Date(),
+        },
+      ])
+    }
+  }
+
   // ── Confirm extract: user clicked "添加到库" on the pending chip
   const confirmExtract = useCallback(async () => {
     if (!pendingExtract) return
@@ -300,6 +388,13 @@ export function HomeWorkstation() {
   async function handleSend() {
     const text = input.trim()
     if (!text || isLoading) return
+
+    if (isArchiveUndoIntent(text)) {
+      setInput("")
+      restoreLastArchive(text)
+      return
+    }
+
     const activeKey = settings.apiKeys[settings.provider] ?? ""
     if (!activeKey) {
       setToast("请先在设置中配置 API Key")
@@ -388,8 +483,13 @@ export function HomeWorkstation() {
         }
       }
 
-      if (fullText.includes("[EXPERIENCE_DETECTED]")) {
-        setPendingExtract({ userText: text })
+      if (shouldPromptExperienceSave(text, fullText)) {
+        const cleanSummary = fullText.replace(/\[EXPERIENCE_DETECTED\]/g, "").trim()
+        setPendingExtract({
+          userText: fullText.includes("[EXPERIENCE_DETECTED]")
+            ? text
+            : `${text}\n\nAI 总结：${cleanSummary}`,
+        })
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "请求失败"
@@ -481,7 +581,7 @@ export function HomeWorkstation() {
                 <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-primary/5 border border-primary/20">
                   <div className="flex items-center gap-2 text-xs text-foreground/80">
                     <span className="text-base leading-none">✨</span>
-                    AI 检测到一段可提取的经历
+                    AI 已整理出一段可加入经历库的内容
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button
