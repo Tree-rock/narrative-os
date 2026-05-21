@@ -14,6 +14,7 @@ const COACH_SYSTEM = `你是用户的长期职业叙事教练，风格像一位�
 - 语气温和、好奇、真诚
 - 适度追问：结果是什么？你在其中的角色？有没有具体数字？
 - 不替用户定义价值观，不强行给建议
+- 不要使用 emoji 或表情符号；如需强调，使用清晰短句、Markdown 列表或系统内已有的文字标签
 
 【标记规则】满足以下全部条件时，在回复末尾添加 [EXPERIENCE_DETECTED]：
 1. 用户描述了真实的工作/项目/实践经历（非泛泛提问）
@@ -27,6 +28,14 @@ type ChatMsg = { role: "user" | "assistant"; content: string }
 type MentionContext = {
   experiences?: unknown[]
   jds?: unknown[]
+  library?: {
+    experiences?: unknown[]
+    jds?: unknown[]
+  }
+}
+
+function sanitizeModelText(text: string): string {
+  return text.replace(/\p{Extended_Pictographic}/gu, "")
 }
 
 // ─── OpenAI-compatible streaming ─────────────────────────────
@@ -59,7 +68,7 @@ function openAICompatStream(
               const text: string | undefined = chunk.choices?.[0]?.delta?.content
               if (text) {
                 controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
+                  encoder.encode(`data: ${JSON.stringify({ text: sanitizeModelText(text) })}\n\n`)
                 )
               }
             } catch { /* skip malformed chunk */ }
@@ -94,9 +103,11 @@ export async function POST(req: NextRequest) {
   const encoder = new TextEncoder()
   const experienceCount = context?.experiences?.length ?? 0
   const jdCount = context?.jds?.length ?? 0
+  const libraryExperienceCount = context?.library?.experiences?.length ?? 0
+  const libraryJdCount = context?.library?.jds?.length ?? 0
   const contextBlock =
-    experienceCount > 0 || jdCount > 0
-      ? `\n\n用户本轮显式 @ 了以下上下文。请优先围绕这些材料回答，不要把未提供的信息当事实；如果材料不足，提出一个具体追问。\n\n${JSON.stringify(context, null, 2)}`
+    experienceCount > 0 || jdCount > 0 || libraryExperienceCount > 0 || libraryJdCount > 0
+      ? `\n\n系统内当前上下文如下。用户显式 @ 的材料优先级最高；系统库快照用于让你知道经历库和 JD 库里已有内容。不要声称库里有未列出的内容；如果材料不足，提出一个具体追问。\n\n${JSON.stringify(context, null, 2)}`
       : ""
   const systemPrompt = `${COACH_SYSTEM}${contextBlock}`
   const sseHeaders = {
@@ -126,7 +137,7 @@ export async function POST(req: NextRequest) {
               ) {
                 controller.enqueue(
                   encoder.encode(
-                    `data: ${JSON.stringify({ text: event.delta.text })}\n\n`
+                    `data: ${JSON.stringify({ text: sanitizeModelText(event.delta.text) })}\n\n`
                   )
                 )
               }

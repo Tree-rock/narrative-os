@@ -18,6 +18,7 @@ const SYSTEMS: Record<ArtifactType, string> = {
 - 提及1-2个最匹配的具体经历/数据
 - 结尾用开放式邀请而非急切推销
 - 不要用"您好，我叫XXX"等流水线开头
+- 不要使用 emoji 或表情符号
 
 直接输出消息正文，不要任何说明或标题。`,
 
@@ -38,7 +39,7 @@ const SYSTEMS: Record<ArtifactType, string> = {
 ## 你可以问面试官的问题
 - [2-3个有质量的反问]
 
-直接输出 Markdown 格式，不要其他说明。`,
+直接输出 Markdown 格式，不要其他说明。不要使用 emoji 或表情符号。`,
 
   resume_bullets: `你是简历写作专家。将候选人经历改写为与目标 JD 高度匹配的简历条目。
 
@@ -47,6 +48,7 @@ const SYSTEMS: Record<ArtifactType, string> = {
 - 强动词开头（主导、推动、搭建、提升…）
 - 包含具体数字/结果
 - 关键词与 JD 匹配
+- 不要使用 emoji 或表情符号
 
 格式：
 **[经历名称]**
@@ -54,6 +56,10 @@ const SYSTEMS: Record<ArtifactType, string> = {
 • [bullet 2（如有）]
 
 直接输出，不要额外说明。`,
+}
+
+function sanitizeModelText(text: string): string {
+  return text.replace(/\p{Extended_Pictographic}/gu, "")
 }
 
 // ─── Build user message ───────────────────────────────────────
@@ -126,7 +132,7 @@ function openAICompatStream(upstreamRes: Response, encoder: TextEncoder): Readab
               const chunk = JSON.parse(raw)
               const text: string | undefined = chunk.choices?.[0]?.delta?.content
               if (text) {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: sanitizeModelText(text) })}\n\n`))
               }
             } catch { /* skip malformed */ }
           }
@@ -191,7 +197,7 @@ export async function POST(req: NextRequest) {
                 event.delta.type === "text_delta"
               ) {
                 controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`)
+                  encoder.encode(`data: ${JSON.stringify({ text: sanitizeModelText(event.delta.text) })}\n\n`)
                 )
               }
             }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { Send, Mic, Plus, ChevronRight, Settings, FileUp, Trash2, BookOpen, Briefcase, X } from "lucide-react"
+import { Send, Mic, Plus, ChevronRight, Settings, FileUp, Trash2, BookOpen, Briefcase, X, Sparkles } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
@@ -252,6 +252,29 @@ export function HomeWorkstation() {
   }
 
   function buildMentionContext() {
+    const libraryExperiences = allExperiences.slice(0, 30).map((entry) => ({
+      id: entry.id,
+      name: entry.project_name ?? entry.raw_input.slice(0, 24),
+      role: entry.role,
+      time_period: entry.time_period,
+      skills: entry.skills?.slice(0, 6),
+      results: entry.results?.slice(0, 3),
+      metrics: entry.metrics,
+      concise: entry.v_concise,
+      locked: entry.locked,
+    }))
+    const libraryJds = workspaces.slice(0, 30).map((workspace) => ({
+      id: workspace.id,
+      title: workspace.title,
+      company: workspace.company,
+      position: workspace.position,
+      status: workspace.status,
+      summary: workspace.parsed_jd?.summary,
+      keywords: workspace.parsed_jd?.keywords?.slice(0, 8),
+      key_requirements: workspace.parsed_jd?.key_requirements?.slice(0, 6),
+      locked: workspace.locked,
+    }))
+
     return {
       experiences: selectedMentions
         .filter((item): item is Extract<MentionTarget, { kind: "experience" }> => item.kind === "experience")
@@ -282,6 +305,10 @@ export function HomeWorkstation() {
           status: workspace.status,
           locked: workspace.locked,
         })),
+      library: {
+        experiences: libraryExperiences,
+        jds: libraryJds,
+      },
     }
   }
 
@@ -590,7 +617,9 @@ export function HomeWorkstation() {
               >
                 <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-primary/5 border border-primary/20">
                   <div className="flex items-center gap-2 text-xs text-foreground/80">
-                    <span className="text-base leading-none">✨</span>
+                    <span className="flex h-5 w-5 items-center justify-center rounded-md bg-primary/10 text-primary">
+                      <Sparkles className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    </span>
                     AI 已基于聊天整理出一段可加入经历库的内容
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
