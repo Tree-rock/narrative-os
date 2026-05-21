@@ -18,6 +18,8 @@ export interface WorkspaceArtifact {
   generated_at: string
 }
 
+export type WorkspaceStatus = "active" | "opportunity" | "learning" | "archived"
+
 export interface JDWorkspace {
   id: string
   title: string
@@ -27,7 +29,7 @@ export interface JDWorkspace {
   parsed_jd?: ParsedJD
   activated_experience_ids: string[]
   artifacts: WorkspaceArtifact[]
-  status: "active" | "archived"
+  status: WorkspaceStatus
   locked?: boolean
   created_at: string
   updated_at: string

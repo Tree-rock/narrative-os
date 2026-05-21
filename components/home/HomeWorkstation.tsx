@@ -13,7 +13,30 @@ import { AddExperienceModal } from "@/components/experiences/AddExperienceModal"
 import { ResumeImportModal } from "@/components/home/ResumeImportModal"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import type { ChatMessage, ExperienceEntry, AISettings } from "@/types/experience"
-import type { JDWorkspace } from "@/types/workspace"
+import type { JDWorkspace, WorkspaceStatus } from "@/types/workspace"
+
+const STATUS_META: Record<WorkspaceStatus, { label: string; dot: string; className: string }> = {
+  active: {
+    label: "进行中",
+    dot: "bg-primary",
+    className: "bg-primary/10 text-primary border-primary/20",
+  },
+  opportunity: {
+    label: "等机会",
+    dot: "bg-amber-500",
+    className: "bg-amber-50 text-amber-700 border-amber-200",
+  },
+  learning: {
+    label: "学习中",
+    dot: "bg-sky-500",
+    className: "bg-sky-50 text-sky-700 border-sky-200",
+  },
+  archived: {
+    label: "已归档",
+    dot: "bg-muted-foreground/40",
+    className: "bg-muted text-muted-foreground border-border/60",
+  },
+}
 
 type MentionTarget =
   | { kind: "experience"; id: string; label: string; description: string; entry: ExperienceEntry }
@@ -234,6 +257,7 @@ export function HomeWorkstation() {
           position: workspace.position,
           jd_text: workspace.jd_text,
           parsed_jd: workspace.parsed_jd,
+          status: workspace.status,
           locked: workspace.locked,
         })),
     }
@@ -381,6 +405,15 @@ export function HomeWorkstation() {
       handleSend()
     }
   }
+
+  const currentWorkspace =
+    workspaces.find((workspace) => workspace.status === "active") ??
+    workspaces.find((workspace) => workspace.status === "opportunity") ??
+    workspaces.find((workspace) => workspace.status === "learning") ??
+    workspaces[0]
+  const currentStatus = currentWorkspace
+    ? STATUS_META[currentWorkspace.status] ?? STATUS_META.active
+    : null
 
   // ─── Render ─────────────────────────────────────────────────
   return (
@@ -598,11 +631,19 @@ export function HomeWorkstation() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-foreground truncate">
-                    暂无激活的 Workspace
+                    {currentWorkspace?.title ?? "暂无激活的 Workspace"}
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    上传 JD 创建第一个
+                    {currentWorkspace?.company ?? "上传 JD 创建第一个"}
                   </div>
+                  {currentWorkspace && currentStatus && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className={cn("w-1.5 h-1.5 rounded-full", currentStatus.dot)} />
+                      <span className={cn("text-[11px] px-2 py-0.5 rounded-full border", currentStatus.className)}>
+                        {currentStatus.label}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0 mt-0.5 group-hover:text-muted-foreground transition-colors" />
               </div>
@@ -668,6 +709,10 @@ export function HomeWorkstation() {
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-border" />
                 经历库 {localGetExperiences().length} 条记录
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-border" />
+                JD 库 {workspaces.length} 条记录
               </div>
             </div>
           </div>

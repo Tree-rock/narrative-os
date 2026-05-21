@@ -8,7 +8,26 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { wsGetAll, wsCreate, wsDelete, wsUpdate } from "@/lib/workspace-store"
 import { getSettings } from "@/lib/settings"
-import type { JDWorkspace, ParsedJD } from "@/types/workspace"
+import type { JDWorkspace, ParsedJD, WorkspaceStatus } from "@/types/workspace"
+
+const STATUS_META: Record<WorkspaceStatus, { label: string; className: string }> = {
+  active: {
+    label: "进行中",
+    className: "bg-primary/10 text-primary border-primary/20",
+  },
+  opportunity: {
+    label: "等机会",
+    className: "bg-amber-50 text-amber-700 border-amber-200",
+  },
+  learning: {
+    label: "学习中",
+    className: "bg-sky-50 text-sky-700 border-sky-200",
+  },
+  archived: {
+    label: "已归档",
+    className: "bg-muted text-muted-foreground border-border/60",
+  },
+}
 
 function linesToList(value: string): string[] {
   return value.split("\n").map((item) => item.trim()).filter(Boolean)
@@ -151,6 +170,7 @@ function EditWorkspaceModal({
     title: ws.title,
     company: ws.company ?? "",
     position: ws.position ?? "",
+    status: ws.status,
     jd_text: ws.jd_text,
     summary: ws.parsed_jd?.summary ?? "",
     keywords: (ws.parsed_jd?.keywords ?? []).join(", "),
@@ -178,6 +198,7 @@ function EditWorkspaceModal({
       title: form.title || "未命名职位",
       company: form.company,
       position: form.position,
+      status: form.status,
       jd_text: form.jd_text,
       parsed_jd,
       locked,
@@ -235,6 +256,23 @@ function EditWorkspaceModal({
                 placeholder="岗位"
                 className="text-sm bg-muted/30 border border-border/60 rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring/40 transition-all"
               />
+            </div>
+            <div className="grid grid-cols-3 gap-2 pt-1">
+              {(["active", "opportunity", "learning"] as WorkspaceStatus[]).map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => set("status", status)}
+                  className={cn(
+                    "h-9 rounded-xl border text-xs transition-all",
+                    form.status === status
+                      ? STATUS_META[status].className
+                      : "border-border/60 text-muted-foreground hover:border-border hover:bg-muted/30"
+                  )}
+                >
+                  {STATUS_META[status].label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -348,6 +386,7 @@ function WorkspaceCard({
 }) {
   const [hover, setHover] = useState(false)
   const keywords = ws.parsed_jd?.keywords ?? []
+  const statusMeta = STATUS_META[ws.status] ?? STATUS_META.active
 
   return (
     <motion.div
@@ -372,8 +411,8 @@ function WorkspaceCard({
             <h3 className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate">
               {ws.title}
             </h3>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground shrink-0">
-              {ws.status === "active" ? "进行中" : "已归档"}
+            <span className={cn("text-[11px] px-2 py-0.5 rounded-full border shrink-0", statusMeta.className)}>
+              {statusMeta.label}
             </span>
           </div>
           {ws.company && (

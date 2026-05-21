@@ -10,11 +10,38 @@ import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { wsGet, wsToggleExperience, wsUpsertArtifact } from "@/lib/workspace-store"
 import { localGetExperiences } from "@/lib/local-store"
 import { getSettings } from "@/lib/settings"
-import type { JDWorkspace, ArtifactType } from "@/types/workspace"
+import type { JDWorkspace, ArtifactType, WorkspaceStatus } from "@/types/workspace"
 import type { ExperienceEntry } from "@/types/experience"
 
 // ─── Tab types ────────────────────────────────────────────────
 type Tab = "overview" | "experiences" | "artifacts"
+
+const STATUS_META: Record<WorkspaceStatus, { label: string; className: string }> = {
+  active: {
+    label: "进行中",
+    className: "bg-primary/10 text-primary border-primary/20",
+  },
+  opportunity: {
+    label: "等机会",
+    className: "bg-amber-50 text-amber-700 border-amber-200",
+  },
+  learning: {
+    label: "学习中",
+    className: "bg-sky-50 text-sky-700 border-sky-200",
+  },
+  archived: {
+    label: "已归档",
+    className: "bg-muted text-muted-foreground border-border/60",
+  },
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-[12px] font-medium text-muted-foreground/60 tracking-[0.08em] mb-4">
+      {children}
+    </div>
+  )
+}
 
 // ─── Overview Tab ─────────────────────────────────────────────
 function OverviewTab({ ws }: { ws: JDWorkspace }) {
@@ -28,77 +55,71 @@ function OverviewTab({ ws }: { ws: JDWorkspace }) {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      {/* 概述 */}
-      <div className="narrative-card p-5">
-        <div className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest mb-2">
-          职位概述
-        </div>
-        <p className="text-sm text-foreground leading-relaxed">{jd.summary}</p>
-        <div className="flex flex-wrap gap-1.5 mt-3">
+    <div className="max-w-3xl space-y-10">
+      <section>
+        <SectionTitle>职位概述</SectionTitle>
+        <p className="text-[17px] text-foreground leading-8 max-w-2xl">
+          {jd.summary}
+        </p>
+        <div className="flex flex-wrap gap-2 mt-5">
           {jd.keywords.map((k) => (
-            <span key={k} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+            <span
+              key={k}
+              className="text-xs px-3 py-1 rounded-full bg-muted/70 text-muted-foreground border border-border/30"
+            >
               {k}
             </span>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* 关键要求 */}
-      <div>
-        <div className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest mb-3">
-          关键要求
-        </div>
-        <div className="space-y-2">
+      <section>
+        <SectionTitle>关键要求</SectionTitle>
+        <div className="space-y-3">
           {jd.key_requirements.map((req, i) => (
-            <div key={i} className="flex items-start gap-3 text-sm text-foreground">
-              <span className="text-primary mt-0.5 shrink-0 font-medium">{i + 1}</span>
-              {req}
+            <div key={i} className="grid grid-cols-[28px_1fr] gap-3 items-start text-[16px] leading-7 text-foreground">
+              <span className="text-primary font-medium tabular-nums text-right">
+                {i + 1}
+              </span>
+              <span>{req}</span>
             </div>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* 文化信号 */}
       {jd.culture_signals.length > 0 && (
-        <div>
-          <div className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest mb-3">
-            文化信号
-          </div>
-          <div className="space-y-2">
+        <section>
+          <SectionTitle>文化信号</SectionTitle>
+          <div className="space-y-3">
             {jd.culture_signals.map((s, i) => (
-              <div key={i} className="flex items-start gap-3 text-sm text-muted-foreground">
-                <span className="mt-0.5 shrink-0">·</span>
-                {s}
+              <div key={i} className="grid grid-cols-[28px_1fr] gap-3 items-start text-[15px] leading-7 text-muted-foreground">
+                <span className="text-right text-muted-foreground/60">·</span>
+                <span>{s}</span>
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* 注意事项 */}
       {jd.red_flags.length > 0 && (
-        <div>
-          <div className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest mb-3">
-            注意事项
-          </div>
-          <div className="space-y-2">
+        <section>
+          <SectionTitle>注意事项</SectionTitle>
+          <div className="space-y-3">
             {jd.red_flags.map((f, i) => (
-              <div key={i} className="flex items-start gap-3 text-sm text-muted-foreground/80">
-                <span className="mt-0.5 shrink-0 text-amber-500">!</span>
-                {f}
+              <div key={i} className="grid grid-cols-[28px_1fr] gap-3 items-start text-[15px] leading-7 text-muted-foreground">
+                <span className="text-right text-amber-500">!</span>
+                <span>{f}</span>
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* 原始 JD */}
-      <details className="group">
-        <summary className="text-xs text-muted-foreground/50 hover:text-muted-foreground cursor-pointer select-none transition-colors">
+      <details className="group pt-1">
+        <summary className="text-sm text-muted-foreground/50 hover:text-muted-foreground cursor-pointer select-none transition-colors">
           查看原始 JD
         </summary>
-        <pre className="mt-3 text-xs text-muted-foreground/70 leading-relaxed whitespace-pre-wrap font-sans bg-muted/30 rounded-xl p-4 max-h-60 overflow-y-auto">
+        <pre className="mt-4 text-xs text-muted-foreground/70 leading-relaxed whitespace-pre-wrap font-sans bg-muted/30 rounded-xl border border-border/40 p-4 max-h-60 overflow-y-auto">
           {ws.jd_text}
         </pre>
       </details>
@@ -451,6 +472,7 @@ export default function WorkspaceDetailPage() {
   if (!ws) return null
 
   const activatedExps = allExps.filter((e) => ws.activated_experience_ids.includes(e.id))
+  const statusMeta = STATUS_META[ws.status] ?? STATUS_META.active
 
   const TABS: { id: Tab; label: string; badge?: number }[] = [
     { id: "overview",     label: "概览" },
@@ -478,8 +500,8 @@ export default function WorkspaceDetailPage() {
               <p className="text-sm text-muted-foreground mt-1">{ws.company}</p>
             )}
           </div>
-          <span className="text-[11px] px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground shrink-0 mt-1">
-            {ws.status === "active" ? "进行中" : "已归档"}
+          <span className={cn("text-[11px] px-2.5 py-1 rounded-full border shrink-0 mt-1", statusMeta.className)}>
+            {statusMeta.label}
           </span>
         </div>
       </div>
