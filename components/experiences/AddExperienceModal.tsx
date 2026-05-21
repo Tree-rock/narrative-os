@@ -67,7 +67,7 @@ export function AddExperienceModal({ onClose, onSaved }: Props) {
     setSaving(true)
     try {
       const entry = localCreateExperience({
-        raw_input: text,
+        raw_input: extracted.v_summary ?? text,
         input_type: "text",
         ...extracted,
       })
@@ -206,6 +206,16 @@ export function AddExperienceModal({ onClose, onSaved }: Props) {
                     </div>
                   )}
                 </div>
+
+                {/* 入库总结版 */}
+                {extracted.v_summary && (
+                  <div className="border border-border/60 rounded-xl p-3">
+                    <div className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-widest mb-1.5">
+                      入库总结版
+                    </div>
+                    <p className="text-sm text-foreground leading-relaxed">{extracted.v_summary}</p>
+                  </div>
+                )}
 
                 {/* 成果 */}
                 {extracted.results && extracted.results.length > 0 && (

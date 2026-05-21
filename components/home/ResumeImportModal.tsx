@@ -116,7 +116,7 @@ export function ResumeImportModal({ onClose, onSaved }: Props) {
     setSaving(true)
     const entries = extracted.map((exp) =>
       localCreateExperience({
-        raw_input: text || `（从简历导入：${exp.project_name}）`,
+        raw_input: exp.v_summary ?? (text || `（从简历导入：${exp.project_name}）`),
         input_type: "resume",
         ...exp,
       })
@@ -310,6 +310,11 @@ export function ResumeImportModal({ onClose, onSaved }: Props) {
                         {exp.v_concise && (
                           <p className="text-xs text-muted-foreground/80 mt-0.5 leading-relaxed">
                             {exp.v_concise}
+                          </p>
+                        )}
+                        {exp.v_summary && (
+                          <p className="text-xs text-muted-foreground/70 mt-1 leading-relaxed line-clamp-2">
+                            {exp.v_summary}
                           </p>
                         )}
                         <div className="flex flex-wrap gap-1 mt-1.5">

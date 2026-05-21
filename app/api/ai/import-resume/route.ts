@@ -19,13 +19,14 @@ JSON 字符串值中若需换行使用 \\n，不得包含实际换行符。
     "skills": ["技能1", "技能2"],
     "results": ["量化成果1", "成果2"],
     "metrics": "核心数字指标（无则null）",
+    "v_summary": "入库总结版（最完整版本，120-220字。必须整合公司/项目、角色、背景、行动、方法、结果、指标和能力关键词。其他字段必须基于这个版本提取）",
     "v_concise": "简历bullet（20字以内，强动词开头）",
     "v_star": "STAR叙事（100-150字，背景/任务/行动/结果）",
     "suitable_roles": ["适配求职方向1", "方向2"]
   }
 ]
 
-注意：教育经历不纳入提取范围，只提取工作和项目经历。`
+注意：教育经历不纳入提取范围，只提取工作和项目经历。必须先为每段经历生成 v_summary，再基于 v_summary 生成其他字段。`
 
 // ─── Parse raw JSON array from model response ─────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

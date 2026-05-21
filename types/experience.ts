@@ -22,6 +22,7 @@ export interface ExperienceEntry {
   turning_pt?: string
 
   // 多版本叙事
+  v_summary?: string
   v_star?: string
   v_concise?: string
   v_chat?: string

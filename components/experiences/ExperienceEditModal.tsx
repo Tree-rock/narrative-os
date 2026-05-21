@@ -142,6 +142,7 @@ export function ExperienceEditModal({ exp, onClose, onSaved }: Props) {
     skills: exp.skills ?? [],
     results: exp.results ?? [],
     metrics: exp.metrics ?? "",
+    v_summary: exp.v_summary ?? "",
     v_concise: exp.v_concise ?? "",
     v_star: exp.v_star ?? "",
     suitable_roles: exp.suitable_roles ?? [],
@@ -240,6 +241,18 @@ export function ExperienceEditModal({ exp, onClose, onSaved }: Props) {
               onChange={(e) => set("metrics", e.target.value)}
               placeholder="如：转化率提升 30%、DAU 增长 5 万…"
               className="w-full text-sm bg-muted/30 border border-border/60 rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring/40 transition-all"
+            />
+          </div>
+
+          {/* 入库总结版 */}
+          <div>
+            <SectionLabel>入库总结版</SectionLabel>
+            <textarea
+              value={form.v_summary}
+              onChange={(e) => set("v_summary", e.target.value)}
+              placeholder="最完整、可独立理解的一段经历总结。包含背景、角色、行动、方法、结果和价值…"
+              rows={4}
+              className="w-full resize-none text-sm bg-muted/30 border border-border/60 rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring/40 transition-all leading-relaxed"
             />
           </div>
 

@@ -263,6 +263,7 @@ export function HomeWorkstation() {
       results: entry.results,
       metrics: entry.metrics,
       values: entry.values,
+      summary_version: entry.v_summary,
       concise: entry.v_concise,
       star: entry.v_star,
       chat_version: entry.v_chat,
@@ -302,6 +303,7 @@ export function HomeWorkstation() {
           skills: entry.skills,
           results: entry.results,
           metrics: entry.metrics,
+          v_summary: entry.v_summary,
           v_star: entry.v_star,
           v_concise: entry.v_concise,
           v_chat: entry.v_chat,
@@ -376,7 +378,7 @@ export function HomeWorkstation() {
         activityAdd({
           type: "archive_restored",
           title: `恢复经历：${restored.project_name ?? restored.raw_input.slice(0, 24)}`,
-          summary: restored.v_concise ?? restored.raw_input.slice(0, 80),
+          summary: restored.v_summary ?? restored.v_concise ?? restored.raw_input.slice(0, 80),
         })
         setMessages((prev) => [
           ...prev,
@@ -445,7 +447,7 @@ export function HomeWorkstation() {
       const data = await res.json()
       if (!res.ok || data.error) throw new Error(data.error ?? "提取失败")
       const entry = localCreateExperience({
-        raw_input: pendingExtract.assistantSummary ?? pendingExtract.sourceText,
+        raw_input: data.v_summary ?? pendingExtract.assistantSummary ?? pendingExtract.sourceText,
         input_type: "text",
         ...data,
       })
@@ -454,7 +456,7 @@ export function HomeWorkstation() {
       activityAdd({
         type: "experience_saved",
         title: `从对话入库：${entry.project_name ?? "经历"}`,
-        summary: entry.v_concise ?? entry.v_chat ?? entry.raw_input.slice(0, 120),
+        summary: entry.v_summary ?? entry.v_concise ?? entry.v_chat ?? entry.raw_input.slice(0, 120),
         payload: {
           project_name: entry.project_name,
           role: entry.role,
@@ -462,6 +464,7 @@ export function HomeWorkstation() {
           skills: entry.skills,
           results: entry.results,
           metrics: entry.metrics,
+          summary_version: entry.v_summary,
         },
       })
       setToast(`✓ 「${data.project_name ?? "经历"}」已存入经历库`)
@@ -698,7 +701,12 @@ export function HomeWorkstation() {
                           <span className="w-3 h-3 rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin" />
                           提取中…
                         </>
-                      ) : "按总结存入经历库 →"}
+                      ) : (
+                        <>
+                          按入库总结版存入
+                          <ChevronRight className="h-3 w-3" strokeWidth={1.8} />
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -943,7 +951,7 @@ export function HomeWorkstation() {
               activityAdd({
                 type: "experience_saved",
                 title: `手动入库：${entry.project_name ?? "经历"}`,
-                summary: entry.v_concise ?? entry.v_chat ?? entry.raw_input.slice(0, 120),
+                summary: entry.v_summary ?? entry.v_concise ?? entry.v_chat ?? entry.raw_input.slice(0, 120),
                 payload: {
                   project_name: entry.project_name,
                   role: entry.role,
@@ -951,6 +959,7 @@ export function HomeWorkstation() {
                   skills: entry.skills,
                   results: entry.results,
                   metrics: entry.metrics,
+                  summary_version: entry.v_summary,
                 },
               })
               setAddModalOpen(false)
@@ -982,6 +991,7 @@ export function HomeWorkstation() {
                   skills: entry.skills,
                   results: entry.results,
                   metrics: entry.metrics,
+                  summary_version: entry.v_summary,
                   concise: entry.v_concise,
                 })),
               })
