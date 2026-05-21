@@ -46,6 +46,12 @@ type LastArchive =
   | { type: "experience"; id: string; previous: ExperienceEntry }
   | { type: "workspace"; id: string; previous: JDWorkspace }
 
+type PendingExtract = {
+  sourceText: string
+  assistantSummary?: string
+  conversation: Array<{ role: "user" | "assistant"; content: string }>
+}
+
 // ─── Helpers ─────────────────────────────────────────────────
 function genId() {
   return typeof crypto !== "undefined" && crypto.randomUUID
@@ -150,7 +156,7 @@ export function HomeWorkstation() {
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [importModalOpen, setImportModalOpen] = useState(false)
   // Pending experience detection — user must confirm before entry is created
-  const [pendingExtract, setPendingExtract] = useState<{ userText: string } | null>(null)
+  const [pendingExtract, setPendingExtract] = useState<PendingExtract | null>(null)
   const [extracting, setExtracting] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -361,7 +367,9 @@ export function HomeWorkstation() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text: pendingExtract.userText,
+          text: pendingExtract.sourceText,
+          assistantSummary: pendingExtract.assistantSummary,
+          conversation: pendingExtract.conversation,
           provider: s.provider,
           apiKey: s.apiKeys[s.provider] ?? "",
         }),
@@ -369,7 +377,7 @@ export function HomeWorkstation() {
       const data = await res.json()
       if (!res.ok || data.error) throw new Error(data.error ?? "提取失败")
       const entry = localCreateExperience({
-        raw_input: pendingExtract.userText,
+        raw_input: pendingExtract.assistantSummary ?? pendingExtract.sourceText,
         input_type: "text",
         ...data,
       })
@@ -486,9 +494,11 @@ export function HomeWorkstation() {
       if (shouldPromptExperienceSave(text, fullText)) {
         const cleanSummary = fullText.replace(/\[EXPERIENCE_DETECTED\]/g, "").trim()
         setPendingExtract({
-          userText: fullText.includes("[EXPERIENCE_DETECTED]")
-            ? text
-            : `${text}\n\nAI 总结：${cleanSummary}`,
+          sourceText: text,
+          assistantSummary: cleanSummary,
+          conversation: apiMessages
+            .slice(-10)
+            .map((m) => ({ role: m.role, content: m.content })),
         })
       }
     } catch (e) {
@@ -581,7 +591,7 @@ export function HomeWorkstation() {
                 <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-primary/5 border border-primary/20">
                   <div className="flex items-center gap-2 text-xs text-foreground/80">
                     <span className="text-base leading-none">✨</span>
-                    AI 已整理出一段可加入经历库的内容
+                    AI 已基于聊天整理出一段可加入经历库的内容
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button
@@ -600,7 +610,7 @@ export function HomeWorkstation() {
                           <span className="w-3 h-3 rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin" />
                           提取中…
                         </>
-                      ) : "存入经历库 →"}
+                      ) : "按总结存入经历库 →"}
                     </button>
                   </div>
                 </div>

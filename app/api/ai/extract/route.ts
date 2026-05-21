@@ -32,10 +32,14 @@ JSON 字符串值中若需换行使用 \\n，不得包含实际换行符。
 export async function POST(req: NextRequest) {
   const {
     text,
+    assistantSummary,
+    conversation,
     provider = "anthropic",
     apiKey,
   } = (await req.json()) as {
     text: string
+    assistantSummary?: string
+    conversation?: Array<{ role: "user" | "assistant"; content: string }>
     provider?: AIProvider
     apiKey?: string
   }
@@ -53,7 +57,26 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const userMsg = `分析以下经历：\n\n${text}`
+  const contextLines = (conversation ?? [])
+    .slice(-10)
+    .map((m) => `${m.role === "user" ? "用户" : "AI"}：${m.content}`)
+    .join("\n\n")
+
+  const userMsg = assistantSummary?.trim()
+    ? `请基于「AI 已经理解和总结后的经历」提取结构化经历信息。
+
+优先依据 AI 总结，不要机械抽取原始聊天文字；原始输入和最近聊天记录只作为补充佐证。
+如果聊天里有多段无关内容，只提取本次总结对应的那一段经历。
+
+【AI 已总结的经历】
+${assistantSummary}
+
+【用户原始输入】
+${text}
+
+【最近聊天记录】
+${contextLines || "无"}`
+    : `分析以下经历：\n\n${text}`
 
   try {
     let responseText: string
