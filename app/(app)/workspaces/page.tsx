@@ -8,6 +8,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { wsCreate, wsGetVisible, wsUpdate } from "@/lib/workspace-store"
 import { getSettings } from "@/lib/settings"
+import { ArchiveConfirmModal } from "@/components/ui/ArchiveConfirmModal"
 import type { JDWorkspace, ParsedJD, WorkspaceStatus } from "@/types/workspace"
 
 const STATUS_META: Record<WorkspaceStatus, { label: string; className: string }> = {
@@ -496,6 +497,7 @@ export default function WorkspacesPage() {
   const [workspaces, setWorkspaces] = useState<JDWorkspace[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editingWs, setEditingWs] = useState<JDWorkspace | null>(null)
+  const [archivingWs, setArchivingWs] = useState<JDWorkspace | null>(null)
 
   useEffect(() => {
     setWorkspaces(wsGetVisible())
@@ -508,15 +510,15 @@ export default function WorkspacesPage() {
     window.location.href = `/workspaces/${ws.id}`
   }
 
-  function handleArchive(id: string) {
-    const ws = workspaces.find((item) => item.id === id)
+  function confirmArchive() {
+    const ws = archivingWs
     if (!ws) return
-    const confirmed = window.confirm(`确认归档「${ws.title}」吗？\n\n归档后会从 Workspace 列表中隐藏。如需恢复，可以在首页对话里输入「撤回归档」。`)
-    if (!confirmed) return
+    const id = ws.id
     const updated = wsUpdate(id, { status: "archived" })
     if (!updated) return
     localStorage.setItem("narrative_last_archive", JSON.stringify({ type: "workspace", id, previous: ws }))
     setWorkspaces((prev) => prev.filter((w) => w.id !== id))
+    setArchivingWs(null)
   }
 
   function handleToggleLock(id: string) {
@@ -561,7 +563,7 @@ export default function WorkspacesPage() {
                 <WorkspaceCard
                   key={ws.id}
                   ws={ws}
-                  onArchive={handleArchive}
+                  onArchive={(id) => setArchivingWs(workspaces.find((item) => item.id === id) ?? null)}
                   onEdit={setEditingWs}
                   onToggleLock={handleToggleLock}
                 />
@@ -602,6 +604,17 @@ export default function WorkspacesPage() {
             ws={editingWs}
             onClose={() => setEditingWs(null)}
             onSaved={handleSaveEdit}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {archivingWs && (
+          <ArchiveConfirmModal
+            title={`归档「${archivingWs.title}」？`}
+            description="归档后会从 Workspace 列表中隐藏。误操作时，可以回到首页对话里输入「撤回归档」恢复最近一次归档。"
+            onCancel={() => setArchivingWs(null)}
+            onConfirm={confirmArchive}
           />
         )}
       </AnimatePresence>

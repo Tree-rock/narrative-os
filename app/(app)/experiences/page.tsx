@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { localArchiveExperience, localGetExperiences, localUpdateExperience } from "@/lib/local-store"
 import { AddExperienceModal } from "@/components/experiences/AddExperienceModal"
 import { ExperienceEditModal } from "@/components/experiences/ExperienceEditModal"
+import { ArchiveConfirmModal } from "@/components/ui/ArchiveConfirmModal"
 import type { ExperienceEntry } from "@/types/experience"
 
 // ─── Skill chip ───────────────────────────────────────────────
@@ -135,22 +136,22 @@ export default function ExperiencesPage() {
   const [experiences, setExperiences] = useState<ExperienceEntry[]>([])
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [editingExp, setEditingExp] = useState<ExperienceEntry | null>(null)
+  const [archivingExp, setArchivingExp] = useState<ExperienceEntry | null>(null)
   const [activeSkill, setActiveSkill] = useState<string | null>(null)
 
   useEffect(() => {
     setExperiences(localGetExperiences())
   }, [])
 
-  function handleArchive(id: string) {
-    const exp = experiences.find((e) => e.id === id)
+  function confirmArchive() {
+    const exp = archivingExp
     if (!exp) return
-    const label = exp.project_name ?? exp.raw_input.slice(0, 24)
-    const confirmed = window.confirm(`确认归档「${label}」吗？\n\n归档后会从经历库列表中隐藏。如需恢复，可以在首页对话里输入「撤回归档」。`)
-    if (!confirmed) return
+    const id = exp.id
     const archived = localArchiveExperience(id)
     if (!archived) return
     localStorage.setItem("narrative_last_archive", JSON.stringify({ type: "experience", id, previous: exp }))
     setExperiences((prev) => prev.filter((e) => e.id !== id))
+    setArchivingExp(null)
   }
 
   function handleToggleLock(id: string) {
@@ -250,7 +251,7 @@ export default function ExperiencesPage() {
                 <ExperienceCard
                   key={exp.id}
                   exp={exp}
-                  onArchive={handleArchive}
+                  onArchive={(id) => setArchivingExp(experiences.find((e) => e.id === id) ?? null)}
                   onEdit={setEditingExp}
                   onToggleLock={handleToggleLock}
                 />
@@ -296,6 +297,17 @@ export default function ExperiencesPage() {
             exp={editingExp}
             onClose={() => setEditingExp(null)}
             onSaved={handleSaveEdit}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {archivingExp && (
+          <ArchiveConfirmModal
+            title={`归档「${archivingExp.project_name ?? archivingExp.raw_input.slice(0, 24)}」？`}
+            description="归档后会从经历库列表中隐藏。误操作时，可以回到首页对话里输入「撤回归档」恢复最近一次归档。"
+            onCancel={() => setArchivingExp(null)}
+            onConfirm={confirmArchive}
           />
         )}
       </AnimatePresence>
