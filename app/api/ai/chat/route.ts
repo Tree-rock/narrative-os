@@ -32,6 +32,7 @@ type MentionContext = {
     experiences?: unknown[]
     jds?: unknown[]
   }
+  activity?: unknown[]
 }
 
 function sanitizeModelText(text: string): string {
@@ -105,9 +106,10 @@ export async function POST(req: NextRequest) {
   const jdCount = context?.jds?.length ?? 0
   const libraryExperienceCount = context?.library?.experiences?.length ?? 0
   const libraryJdCount = context?.library?.jds?.length ?? 0
+  const activityCount = context?.activity?.length ?? 0
   const contextBlock =
-    experienceCount > 0 || jdCount > 0 || libraryExperienceCount > 0 || libraryJdCount > 0
-      ? `\n\n系统内当前上下文如下。用户显式 @ 的材料优先级最高；系统库快照用于让你知道经历库和 JD 库里已有内容。不要声称库里有未列出的内容；如果材料不足，提出一个具体追问。\n\n${JSON.stringify(context, null, 2)}`
+    experienceCount > 0 || jdCount > 0 || libraryExperienceCount > 0 || libraryJdCount > 0 || activityCount > 0
+      ? `\n\n系统内当前上下文如下。用户显式 @ 的材料优先级最高；系统库快照代表当前可用的经历库和 JD 库；activity 是最近输入、简历解析、入库、恢复等系统事件。归档内容不在当前可用库快照中时，视为已从当前工作系统删除，不要主动作为可用经历或 JD 使用。不要声称库里有未列出的内容；如果材料不足，提出一个具体追问。\n\n${JSON.stringify(context, null, 2)}`
       : ""
   const systemPrompt = `${COACH_SYSTEM}${contextBlock}`
   const sseHeaders = {

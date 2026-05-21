@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { getSettings } from "@/lib/settings"
 import { localCreateExperience, localGetExperiences, localUpdateExperience } from "@/lib/local-store"
 import { wsGetVisible, wsUpdate } from "@/lib/workspace-store"
+import { activityAdd, activityRecent } from "@/lib/activity-store"
 import { chatLoad, chatSave, chatClear } from "@/lib/chat-store"
 import { AddExperienceModal } from "@/components/experiences/AddExperienceModal"
 import { ResumeImportModal } from "@/components/home/ResumeImportModal"
@@ -43,8 +44,8 @@ type MentionTarget =
   | { kind: "jd"; id: string; label: string; description: string; workspace: JDWorkspace }
 
 type LastArchive =
-  | { type: "experience"; id: string; previous: ExperienceEntry }
-  | { type: "workspace"; id: string; previous: JDWorkspace }
+  | { type: "experience"; id: string; previous: ExperienceEntry; archivedAt?: string; expiresAt?: string }
+  | { type: "workspace"; id: string; previous: JDWorkspace; archivedAt?: string; expiresAt?: string }
 
 type PendingExtract = {
   sourceText: string
@@ -252,27 +253,41 @@ export function HomeWorkstation() {
   }
 
   function buildMentionContext() {
-    const libraryExperiences = allExperiences.slice(0, 30).map((entry) => ({
+    const libraryExperiences = allExperiences.slice(0, 50).map((entry) => ({
       id: entry.id,
       name: entry.project_name ?? entry.raw_input.slice(0, 24),
       role: entry.role,
       time_period: entry.time_period,
-      skills: entry.skills?.slice(0, 6),
-      results: entry.results?.slice(0, 3),
+      actions: entry.actions,
+      skills: entry.skills,
+      results: entry.results,
       metrics: entry.metrics,
+      values: entry.values,
       concise: entry.v_concise,
+      star: entry.v_star,
+      chat_version: entry.v_chat,
+      suitable_roles: entry.suitable_roles,
       locked: entry.locked,
     }))
-    const libraryJds = workspaces.slice(0, 30).map((workspace) => ({
+    const libraryJds = workspaces.slice(0, 50).map((workspace) => ({
       id: workspace.id,
       title: workspace.title,
       company: workspace.company,
       position: workspace.position,
       status: workspace.status,
       summary: workspace.parsed_jd?.summary,
-      keywords: workspace.parsed_jd?.keywords?.slice(0, 8),
-      key_requirements: workspace.parsed_jd?.key_requirements?.slice(0, 6),
+      keywords: workspace.parsed_jd?.keywords,
+      key_requirements: workspace.parsed_jd?.key_requirements,
+      culture_signals: workspace.parsed_jd?.culture_signals,
+      red_flags: workspace.parsed_jd?.red_flags,
       locked: workspace.locked,
+    }))
+    const recentActivity = activityRecent(40).map((item) => ({
+      type: item.type,
+      title: item.title,
+      summary: item.summary,
+      created_at: item.created_at,
+      payload: item.payload,
     }))
 
     return {
@@ -309,6 +324,7 @@ export function HomeWorkstation() {
         experiences: libraryExperiences,
         jds: libraryJds,
       },
+      activity: recentActivity,
     }
   }
 
@@ -336,12 +352,32 @@ export function HomeWorkstation() {
 
     try {
       const last = JSON.parse(raw) as LastArchive
+      if (last.expiresAt && Date.now() > new Date(last.expiresAt).getTime()) {
+        localStorage.removeItem("narrative_last_archive")
+        setMessages((prev) => [
+          ...prev,
+          userMsg,
+          {
+            id: genId(),
+            role: "assistant",
+            content: "这次归档已经超过 5 分钟撤回窗口，不能再通过对话恢复。",
+            createdAt: new Date(),
+          },
+        ])
+        return
+      }
+
       if (last.type === "experience") {
         const restored = localUpdateExperience(last.id, { archived: false })
         if (!restored) throw new Error("经历记录不存在")
         setAllExperiences((prev) => [restored, ...prev.filter((entry) => entry.id !== restored.id)])
         setExperiences((prev) => [restored, ...prev.filter((entry) => entry.id !== restored.id)].slice(0, 5))
         localStorage.removeItem("narrative_last_archive")
+        activityAdd({
+          type: "archive_restored",
+          title: `恢复经历：${restored.project_name ?? restored.raw_input.slice(0, 24)}`,
+          summary: restored.v_concise ?? restored.raw_input.slice(0, 80),
+        })
         setMessages((prev) => [
           ...prev,
           userMsg,
@@ -360,6 +396,11 @@ export function HomeWorkstation() {
       if (!restored) throw new Error("JD 记录不存在")
       setWorkspaces(wsGetVisible())
       localStorage.removeItem("narrative_last_archive")
+      activityAdd({
+        type: "archive_restored",
+        title: `恢复 JD：${restored.title}`,
+        summary: restored.parsed_jd?.summary ?? restored.jd_text.slice(0, 80),
+      })
       setMessages((prev) => [
         ...prev,
         userMsg,
@@ -410,6 +451,19 @@ export function HomeWorkstation() {
       })
       setAllExperiences((prev) => [entry, ...prev])
       setExperiences((prev) => [entry, ...prev].slice(0, 5))
+      activityAdd({
+        type: "experience_saved",
+        title: `从对话入库：${entry.project_name ?? "经历"}`,
+        summary: entry.v_concise ?? entry.v_chat ?? entry.raw_input.slice(0, 120),
+        payload: {
+          project_name: entry.project_name,
+          role: entry.role,
+          time_period: entry.time_period,
+          skills: entry.skills,
+          results: entry.results,
+          metrics: entry.metrics,
+        },
+      })
       setToast(`✓ 「${data.project_name ?? "经历"}」已存入经历库`)
     } catch (e) {
       setToast(`提取失败：${e instanceof Error ? e.message : "请重试"}`)
@@ -423,6 +477,11 @@ export function HomeWorkstation() {
   async function handleSend() {
     const text = input.trim()
     if (!text || isLoading) return
+    activityAdd({
+      type: "user_input",
+      title: "首页对话输入",
+      summary: text.slice(0, 240),
+    })
 
     if (isArchiveUndoIntent(text)) {
       setInput("")
@@ -881,6 +940,19 @@ export function HomeWorkstation() {
             onSaved={(entry) => {
               setAllExperiences((prev) => [entry, ...prev])
               setExperiences((prev) => [entry, ...prev].slice(0, 5))
+              activityAdd({
+                type: "experience_saved",
+                title: `手动入库：${entry.project_name ?? "经历"}`,
+                summary: entry.v_concise ?? entry.v_chat ?? entry.raw_input.slice(0, 120),
+                payload: {
+                  project_name: entry.project_name,
+                  role: entry.role,
+                  time_period: entry.time_period,
+                  skills: entry.skills,
+                  results: entry.results,
+                  metrics: entry.metrics,
+                },
+              })
               setAddModalOpen(false)
               setToast(`✓ 「${entry.project_name ?? "经历"}」已添加到经历库`)
             }}
@@ -896,6 +968,23 @@ export function HomeWorkstation() {
             onSaved={(entries) => {
               setAllExperiences((prev) => [...entries, ...prev])
               setExperiences((prev) => [...entries, ...prev].slice(0, 5))
+              activityAdd({
+                type: "resume_imported",
+                title: `简历导入：${entries.length} 段经历`,
+                summary: entries
+                  .map((entry) => entry.project_name ?? entry.v_concise ?? entry.raw_input.slice(0, 24))
+                  .join("；")
+                  .slice(0, 240),
+                payload: entries.map((entry) => ({
+                  project_name: entry.project_name,
+                  role: entry.role,
+                  time_period: entry.time_period,
+                  skills: entry.skills,
+                  results: entry.results,
+                  metrics: entry.metrics,
+                  concise: entry.v_concise,
+                })),
+              })
               setImportModalOpen(false)
               setToast(`✓ 已导入 ${entries.length} 段经历到经历库`)
             }}

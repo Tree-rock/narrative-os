@@ -149,7 +149,14 @@ export default function ExperiencesPage() {
     const id = exp.id
     const archived = localArchiveExperience(id)
     if (!archived) return
-    localStorage.setItem("narrative_last_archive", JSON.stringify({ type: "experience", id, previous: exp }))
+    const archivedAt = new Date()
+    localStorage.setItem("narrative_last_archive", JSON.stringify({
+      type: "experience",
+      id,
+      previous: exp,
+      archivedAt: archivedAt.toISOString(),
+      expiresAt: new Date(archivedAt.getTime() + 5 * 60 * 1000).toISOString(),
+    }))
     setExperiences((prev) => prev.filter((e) => e.id !== id))
     setArchivingExp(null)
   }
@@ -305,7 +312,7 @@ export default function ExperiencesPage() {
         {archivingExp && (
           <ArchiveConfirmModal
             title={`归档「${archivingExp.project_name ?? archivingExp.raw_input.slice(0, 24)}」？`}
-            description="归档后会从经历库列表中隐藏。误操作时，可以回到首页对话里输入「撤回归档」恢复最近一次归档。"
+            description="归档后会从当前经历库隐藏，并且 AI 不会再把它当作可用经历。你可以在 5 分钟内回到首页对话输入「撤回归档」恢复最近一次归档。"
             onCancel={() => setArchivingExp(null)}
             onConfirm={confirmArchive}
           />

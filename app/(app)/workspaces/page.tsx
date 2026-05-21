@@ -8,6 +8,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { wsCreate, wsGetVisible, wsUpdate } from "@/lib/workspace-store"
 import { getSettings } from "@/lib/settings"
+import { activityAdd } from "@/lib/activity-store"
 import { ArchiveConfirmModal } from "@/components/ui/ArchiveConfirmModal"
 import type { JDWorkspace, ParsedJD, WorkspaceStatus } from "@/types/workspace"
 
@@ -72,6 +73,18 @@ function CreateWorkspaceModal({ onClose, onCreated }: {
         position: data.title,
         jd_text: jdText,
         parsed_jd: data,
+      })
+      activityAdd({
+        type: "workspace_created",
+        title: `JD 入库：${ws.title}`,
+        summary: ws.parsed_jd?.summary ?? jdText.slice(0, 160),
+        payload: {
+          title: ws.title,
+          company: ws.company,
+          position: ws.position,
+          keywords: ws.parsed_jd?.keywords,
+          key_requirements: ws.parsed_jd?.key_requirements,
+        },
       })
       onCreated(ws)
     } catch (e) {
@@ -516,7 +529,14 @@ export default function WorkspacesPage() {
     const id = ws.id
     const updated = wsUpdate(id, { status: "archived" })
     if (!updated) return
-    localStorage.setItem("narrative_last_archive", JSON.stringify({ type: "workspace", id, previous: ws }))
+    const archivedAt = new Date()
+    localStorage.setItem("narrative_last_archive", JSON.stringify({
+      type: "workspace",
+      id,
+      previous: ws,
+      archivedAt: archivedAt.toISOString(),
+      expiresAt: new Date(archivedAt.getTime() + 5 * 60 * 1000).toISOString(),
+    }))
     setWorkspaces((prev) => prev.filter((w) => w.id !== id))
     setArchivingWs(null)
   }
@@ -612,7 +632,7 @@ export default function WorkspacesPage() {
         {archivingWs && (
           <ArchiveConfirmModal
             title={`归档「${archivingWs.title}」？`}
-            description="归档后会从 Workspace 列表中隐藏。误操作时，可以回到首页对话里输入「撤回归档」恢复最近一次归档。"
+            description="归档后会从当前 Workspace 列表中隐藏，并且 AI 不会再把它当作可用 JD。你可以在 5 分钟内回到首页对话输入「撤回归档」恢复最近一次归档。"
             onCancel={() => setArchivingWs(null)}
             onConfirm={confirmArchive}
           />
