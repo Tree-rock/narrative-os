@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, BookOpen, Pencil, Archive, Lock, Unlock } from "lucide-react"
+import { Plus, BookOpen, Pencil, Archive, Lock, Unlock, MessageSquare } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { localArchiveExperience, localGetExperiences, localUpdateExperience } from "@/lib/local-store"
@@ -80,6 +80,12 @@ function ExperienceCard({
               <Chip key={s} label={s} variant="accent" />
             ))}
             {exp.metrics && <Chip label={`✦ ${exp.metrics}`} variant="secondary" />}
+            {(exp.source_excerpt || (exp.source_messages ?? []).length > 0) && (
+              <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                <MessageSquare className="w-3 h-3" strokeWidth={1.5} />
+                有来源
+              </span>
+            )}
           </div>
 
           {/* 适配岗位 */}

@@ -13,7 +13,7 @@ import { chatLoad, chatSave, chatClear } from "@/lib/chat-store"
 import { AddExperienceModal } from "@/components/experiences/AddExperienceModal"
 import { ResumeImportModal } from "@/components/home/ResumeImportModal"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
-import type { ChatMessage, ExperienceEntry, AISettings } from "@/types/experience"
+import type { ChatMessage, ExperienceEntry, ExperienceSourceMessage, AISettings } from "@/types/experience"
 import type { JDWorkspace, WorkspaceStatus } from "@/types/workspace"
 
 const STATUS_META: Record<WorkspaceStatus, { label: string; dot: string; className: string }> = {
@@ -50,7 +50,7 @@ type LastArchive =
 type PendingExtract = {
   sourceText: string
   assistantSummary?: string
-  conversation: Array<{ role: "user" | "assistant"; content: string }>
+  conversation: ExperienceSourceMessage[]
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -264,6 +264,8 @@ export function HomeWorkstation() {
       metrics: entry.metrics,
       values: entry.values,
       summary_version: entry.v_summary,
+      source_excerpt: entry.source_excerpt,
+      source_chat_message_ids: entry.source_chat_message_ids,
       concise: entry.v_concise,
       star: entry.v_star,
       chat_version: entry.v_chat,
@@ -304,6 +306,8 @@ export function HomeWorkstation() {
           results: entry.results,
           metrics: entry.metrics,
           v_summary: entry.v_summary,
+          source_excerpt: entry.source_excerpt,
+          source_chat_message_ids: entry.source_chat_message_ids,
           v_star: entry.v_star,
           v_concise: entry.v_concise,
           v_chat: entry.v_chat,
@@ -449,6 +453,12 @@ export function HomeWorkstation() {
       const entry = localCreateExperience({
         raw_input: data.v_summary ?? pendingExtract.assistantSummary ?? pendingExtract.sourceText,
         input_type: "text",
+        source_type: "chat",
+        source_excerpt: pendingExtract.sourceText,
+        source_messages: pendingExtract.conversation,
+        source_chat_message_ids: pendingExtract.conversation
+          .map((m) => m.id)
+          .filter((id): id is string => Boolean(id)),
         ...data,
       })
       setAllExperiences((prev) => [entry, ...prev])
@@ -465,6 +475,7 @@ export function HomeWorkstation() {
           results: entry.results,
           metrics: entry.metrics,
           summary_version: entry.v_summary,
+          source_excerpt: entry.source_excerpt,
         },
       })
       setToast(`✓ 「${data.project_name ?? "经历"}」已存入经历库`)
@@ -582,12 +593,27 @@ export function HomeWorkstation() {
 
       if (shouldPromptExperienceSave(text, fullText)) {
         const cleanSummary = fullText.replace(/\[EXPERIENCE_DETECTED\]/g, "").trim()
+        const sourceConversation: ExperienceSourceMessage[] = [
+          ...[...messages, userMsg]
+            .filter((m) => m.id !== "welcome")
+            .slice(-9)
+            .map((m) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content.replace(/\[EXPERIENCE_DETECTED\]/g, "").trim(),
+              createdAt: m.createdAt.toISOString(),
+            })),
+          {
+            id: assistantId,
+            role: "assistant",
+            content: cleanSummary,
+            createdAt: new Date().toISOString(),
+          },
+        ]
         setPendingExtract({
           sourceText: text,
           assistantSummary: cleanSummary,
-          conversation: apiMessages
-            .slice(-10)
-            .map((m) => ({ role: m.role, content: m.content })),
+          conversation: sourceConversation,
         })
       }
     } catch (e) {
@@ -960,6 +986,7 @@ export function HomeWorkstation() {
                   results: entry.results,
                   metrics: entry.metrics,
                   summary_version: entry.v_summary,
+                  source_excerpt: entry.source_excerpt,
                 },
               })
               setAddModalOpen(false)
@@ -992,6 +1019,7 @@ export function HomeWorkstation() {
                   results: entry.results,
                   metrics: entry.metrics,
                   summary_version: entry.v_summary,
+                  source_excerpt: entry.source_excerpt,
                   concise: entry.v_concise,
                 })),
               })

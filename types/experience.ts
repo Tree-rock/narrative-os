@@ -1,6 +1,13 @@
 // ─── 经历条目（核心数据结构）────────────────────────────────
 export type InputType = "text" | "voice" | "resume" | "upload"
 
+export interface ExperienceSourceMessage {
+  id?: string
+  role: "user" | "assistant"
+  content: string
+  createdAt?: string
+}
+
 export interface ExperienceEntry {
   id: string
   user_id?: string
@@ -8,6 +15,10 @@ export interface ExperienceEntry {
   // 原始输入
   raw_input: string
   input_type: InputType
+  source_type?: "chat" | "manual" | "resume" | "upload"
+  source_excerpt?: string
+  source_messages?: ExperienceSourceMessage[]
+  source_chat_message_ids?: string[]
 
   // AI 结构化提取
   project_name?: string

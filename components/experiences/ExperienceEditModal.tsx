@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { X, Plus, Trash2, Lock, Unlock } from "lucide-react"
+import { X, Plus, Trash2, Lock, Unlock, MessageSquare } from "lucide-react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { localUpdateExperience } from "@/lib/local-store"
@@ -133,6 +133,14 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
+function SourceRoleLabel({ role }: { role: "user" | "assistant" }) {
+  return (
+    <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-widest">
+      {role === "user" ? "用户原话" : "AI 总结"}
+    </span>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────
 export function ExperienceEditModal({ exp, onClose, onSaved }: Props) {
   const [form, setForm] = useState({
@@ -255,6 +263,45 @@ export function ExperienceEditModal({ exp, onClose, onSaved }: Props) {
               className="w-full resize-none text-sm bg-muted/30 border border-border/60 rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring/40 transition-all leading-relaxed"
             />
           </div>
+
+          {(exp.source_excerpt || (exp.source_messages ?? []).length > 0) && (
+            <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <MessageSquare className="w-3.5 h-3.5 text-muted-foreground/60" strokeWidth={1.5} />
+                <div className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest">
+                  来源片段
+                </div>
+              </div>
+              {(exp.source_messages ?? []).length > 0 ? (
+                <div className="space-y-2 max-h-44 overflow-y-auto scrollbar-thin pr-1">
+                  {(exp.source_messages ?? []).map((message, index) => (
+                    <div key={`${message.id ?? message.role}-${index}`} className="rounded-lg bg-card/70 border border-border/40 px-3 py-2">
+                      <div className="flex items-center justify-between gap-3 mb-1">
+                        <SourceRoleLabel role={message.role} />
+                        {message.createdAt && (
+                          <span className="text-[10px] text-muted-foreground/40">
+                            {new Date(message.createdAt).toLocaleString("zh-CN", {
+                              month: "2-digit",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-foreground/75 leading-relaxed whitespace-pre-wrap">
+                        {message.content}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-foreground/75 leading-relaxed whitespace-pre-wrap">
+                  {exp.source_excerpt}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* 简历 Bullet */}
           <div>

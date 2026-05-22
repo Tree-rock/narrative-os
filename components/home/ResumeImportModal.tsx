@@ -118,6 +118,8 @@ export function ResumeImportModal({ onClose, onSaved }: Props) {
       localCreateExperience({
         raw_input: exp.v_summary ?? (text || `（从简历导入：${exp.project_name}）`),
         input_type: "resume",
+        source_type: "resume",
+        source_excerpt: text || `从文件导入：${file?.name ?? "简历文件"}`,
         ...exp,
       })
     )

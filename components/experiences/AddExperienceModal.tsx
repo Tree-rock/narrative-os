@@ -69,6 +69,13 @@ export function AddExperienceModal({ onClose, onSaved }: Props) {
       const entry = localCreateExperience({
         raw_input: extracted.v_summary ?? text,
         input_type: "text",
+        source_type: "manual",
+        source_excerpt: text,
+        source_messages: [{
+          role: "user",
+          content: text,
+          createdAt: new Date().toISOString(),
+        }],
         ...extracted,
       })
       onSaved(entry)
