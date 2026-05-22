@@ -219,6 +219,8 @@ export function HomeWorkstation() {
   // invariant: type uses unknown to avoid SpeechRecognition DOM-lib variance across TS versions
   const recognitionRef = useRef<unknown>(null)
   const inputSnapshotRef = useRef("")
+  // isComposingRef: 手动跟踪 IME 组合状态，弥补 Chrome 下 keydown.isComposing 时序 bug
+  const isComposingRef = useRef(false)
 
   // ── Init: load settings, experiences, and chat history ─────
   useEffect(() => {
@@ -830,8 +832,9 @@ export function HomeWorkstation() {
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    // nativeEvent.isComposing: IME 输入法组合中（中日韩输入法选词阶段），不触发发送
-    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+    // Chrome + macOS IME bug: compositionend 先于 keydown 触发，导致 isComposing 已为 false
+    // 用 isComposingRef 手动跟踪，两者都不在组合中才允许发送
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !isComposingRef.current) {
       e.preventDefault()
       handleSend()
     }
@@ -1020,6 +1023,8 @@ export function HomeWorkstation() {
                 ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
+                onCompositionStart={() => { isComposingRef.current = true }}
+                onCompositionEnd={() => { isComposingRef.current = false }}
                 onKeyDown={handleKeyDown}
                 placeholder={
                   settings.apiKeys[settings.provider]
