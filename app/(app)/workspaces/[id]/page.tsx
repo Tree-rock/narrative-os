@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Sparkles, Check, Loader2, Copy, RotateCcw, LayoutGrid } from "lucide-react"
+import { ArrowLeft, Sparkles, Check, Loader2, Copy, RotateCcw, LayoutGrid, BookMarked } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
@@ -13,12 +13,13 @@ import { localGetExperiences } from "@/lib/local-store"
 import { appGetAll } from "@/lib/application-store"
 import { getSettings } from "@/lib/settings"
 import { LinkApplicationModal } from "@/components/applications/LinkApplicationModal"
+import { PrepTab } from "@/components/workspaces/PrepTab"
 import type { JDWorkspace, ArtifactType, WorkspaceStatus } from "@/types/workspace"
 import type { ExperienceEntry } from "@/types/experience"
 import type { ApplicationEntry } from "@/types/application"
 
 // ─── Tab types ────────────────────────────────────────────────
-type Tab = "overview" | "experiences" | "artifacts"
+type Tab = "overview" | "experiences" | "artifacts" | "prep"
 
 const STATUS_META: Record<WorkspaceStatus, { label: string; className: string }> = {
   active: {
@@ -485,10 +486,11 @@ export default function WorkspaceDetailPage() {
     { id: "overview",     label: "概览" },
     { id: "experiences",  label: "经历激活", badge: ws.activated_experience_ids.length || undefined },
     { id: "artifacts",    label: "生成产物", badge: ws.artifacts.length || undefined },
+    { id: "prep",         label: "叙事准备" },
   ]
 
   return (
-    <div className="max-w-4xl mx-auto px-8 py-8">
+    <div className={cn("mx-auto px-8 py-8", tab === "prep" ? "max-w-6xl" : "max-w-4xl")}>
       {/* Back + Header */}
       <div className="mb-8">
         <button
@@ -590,6 +592,7 @@ export default function WorkspaceDetailPage() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
           transition={{ duration: 0.15 }}
+          className={tab === "prep" ? "h-[calc(100vh-260px)] min-h-[520px]" : undefined}
         >
           {tab === "overview" && <OverviewTab ws={ws} />}
           {tab === "experiences" && (
@@ -601,6 +604,11 @@ export default function WorkspaceDetailPage() {
               activatedExps={activatedExps}
               onArtifactSaved={handleArtifactSaved}
             />
+          )}
+          {tab === "prep" && (
+            <div className="h-full border border-border/40 rounded-2xl overflow-hidden bg-card">
+              <PrepTab ws={ws} activatedExps={activatedExps} />
+            </div>
           )}
         </motion.div>
       </AnimatePresence>
