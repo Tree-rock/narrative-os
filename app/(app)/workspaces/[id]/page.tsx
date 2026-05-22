@@ -3,15 +3,19 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Sparkles, Check, Loader2, Copy, RotateCcw } from "lucide-react"
+import { ArrowLeft, Sparkles, Check, Loader2, Copy, RotateCcw, LayoutGrid } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { wsGet, wsToggleExperience, wsUpsertArtifact } from "@/lib/workspace-store"
 import { localGetExperiences } from "@/lib/local-store"
+import { appGetAll } from "@/lib/application-store"
 import { getSettings } from "@/lib/settings"
+import { LinkApplicationModal } from "@/components/applications/LinkApplicationModal"
 import type { JDWorkspace, ArtifactType, WorkspaceStatus } from "@/types/workspace"
 import type { ExperienceEntry } from "@/types/experience"
+import type { ApplicationEntry } from "@/types/application"
 
 // ─── Tab types ────────────────────────────────────────────────
 type Tab = "overview" | "experiences" | "artifacts"
@@ -445,12 +449,15 @@ export default function WorkspaceDetailPage() {
   const [ws, setWs] = useState<JDWorkspace | null>(null)
   const [allExps, setAllExps] = useState<ExperienceEntry[]>([])
   const [tab, setTab] = useState<Tab>("overview")
+  const [showLinkModal, setShowLinkModal] = useState(false)
+  const [linkedApp, setLinkedApp] = useState<ApplicationEntry | null>(null)
 
   useEffect(() => {
     const found = wsGet(id)
     if (!found) { router.replace("/workspaces"); return }
     setWs(found)
     setAllExps(localGetExperiences())
+    setLinkedApp(appGetAll().find((a) => a.workspace_id === id) ?? null)
   }, [id, router])
 
   function handleToggleExp(expId: string) {
@@ -500,9 +507,28 @@ export default function WorkspaceDetailPage() {
               <p className="text-sm text-muted-foreground mt-1">{ws.company}</p>
             )}
           </div>
-          <span className={cn("text-[11px] px-2.5 py-1 rounded-full border shrink-0 mt-1", statusMeta.className)}>
-            {statusMeta.label}
-          </span>
+          <div className="flex items-center gap-2 shrink-0 mt-1">
+            <span className={cn("text-[11px] px-2.5 py-1 rounded-full border", statusMeta.className)}>
+              {statusMeta.label}
+            </span>
+            {linkedApp ? (
+              <Link
+                href="/applications"
+                className="flex items-center gap-1.5 text-xs text-primary hover:opacity-70 transition-opacity px-2.5 py-1 rounded-full border border-primary/30 bg-primary/5"
+              >
+                <LayoutGrid className="w-3 h-3" strokeWidth={1.5} />
+                查看追踪
+              </Link>
+            ) : (
+              <button
+                onClick={() => setShowLinkModal(true)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2.5 py-1 rounded-full border border-border/60 hover:border-border transition-all"
+              >
+                <LayoutGrid className="w-3 h-3" strokeWidth={1.5} />
+                追踪投递
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -542,6 +568,19 @@ export default function WorkspaceDetailPage() {
           </button>
         ))}
       </div>
+
+      {/* Link Application Modal */}
+      <AnimatePresence>
+        {showLinkModal && (
+          <LinkApplicationModal
+            workspace={ws}
+            onClose={() => setShowLinkModal(false)}
+            onSaved={() => {
+              setLinkedApp(appGetAll().find((a) => a.workspace_id === id) ?? null)
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Tab Content */}
       <AnimatePresence mode="wait">

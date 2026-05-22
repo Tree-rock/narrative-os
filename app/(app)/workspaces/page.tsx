@@ -2,14 +2,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Briefcase, Loader2, X, ChevronRight, Archive, Pencil, Lock, Unlock } from "lucide-react"
+import { Plus, Briefcase, Loader2, X, ChevronRight, Archive, Pencil, Lock, Unlock, LayoutGrid } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { wsCreate, wsGetVisible, wsUpdate } from "@/lib/workspace-store"
 import { getSettings } from "@/lib/settings"
 import { activityAdd } from "@/lib/activity-store"
+import { appGetAll } from "@/lib/application-store"
 import { ArchiveConfirmModal } from "@/components/ui/ArchiveConfirmModal"
+import { LinkApplicationModal } from "@/components/applications/LinkApplicationModal"
 import type { JDWorkspace, ParsedJD, WorkspaceStatus } from "@/types/workspace"
 
 const STATUS_META: Record<WorkspaceStatus, { label: string; className: string }> = {
@@ -392,15 +394,18 @@ function WorkspaceCard({
   onArchive,
   onEdit,
   onToggleLock,
+  onLink,
 }: {
   ws: JDWorkspace
   onArchive: (id: string) => void
   onEdit: (ws: JDWorkspace) => void
   onToggleLock: (id: string) => void
+  onLink: (ws: JDWorkspace) => void
 }) {
   const [hover, setHover] = useState(false)
   const keywords = ws.parsed_jd?.keywords ?? []
   const statusMeta = STATUS_META[ws.status] ?? STATUS_META.active
+  const hasLinkedApp = appGetAll().some((a) => a.workspace_id === ws.id)
 
   return (
     <motion.div
@@ -462,6 +467,18 @@ function WorkspaceCard({
             )}
           >
             <button
+              onClick={() => onLink(ws)}
+              title={hasLinkedApp ? "更新投递进度" : "追踪此投递"}
+              className={cn(
+                "p-1.5 rounded-md transition-colors",
+                hasLinkedApp
+                  ? "text-primary hover:text-foreground hover:bg-muted"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              )}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </button>
+            <button
               onClick={() => onEdit(ws)}
               title="编辑"
               className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -511,6 +528,7 @@ export default function WorkspacesPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingWs, setEditingWs] = useState<JDWorkspace | null>(null)
   const [archivingWs, setArchivingWs] = useState<JDWorkspace | null>(null)
+  const [linkingWs, setLinkingWs] = useState<JDWorkspace | null>(null)
 
   useEffect(() => {
     setWorkspaces(wsGetVisible())
@@ -586,6 +604,7 @@ export default function WorkspacesPage() {
                   onArchive={(id) => setArchivingWs(workspaces.find((item) => item.id === id) ?? null)}
                   onEdit={setEditingWs}
                   onToggleLock={handleToggleLock}
+                  onLink={setLinkingWs}
                 />
               ))}
             </AnimatePresence>
@@ -624,6 +643,15 @@ export default function WorkspacesPage() {
             ws={editingWs}
             onClose={() => setEditingWs(null)}
             onSaved={handleSaveEdit}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {linkingWs && (
+          <LinkApplicationModal
+            workspace={linkingWs}
+            onClose={() => setLinkingWs(null)}
           />
         )}
       </AnimatePresence>
