@@ -61,23 +61,7 @@ function OverviewTab({ ws }: { ws: JDWorkspace }) {
 
   return (
     <div className="max-w-3xl space-y-10">
-      <section>
-        <SectionTitle>职位概述</SectionTitle>
-        <p className="text-[17px] text-foreground leading-8 max-w-2xl">
-          {jd.summary}
-        </p>
-        <div className="flex flex-wrap gap-2 mt-5">
-          {jd.keywords.map((k) => (
-            <span
-              key={k}
-              className="text-xs px-3 py-1 rounded-full bg-muted/70 text-muted-foreground border border-border/30"
-            >
-              {k}
-            </span>
-          ))}
-        </div>
-      </section>
-
+      {/* ① 精准 JD 要求（原文级，置顶） */}
       <section>
         <SectionTitle>关键要求</SectionTitle>
         <div className="space-y-3">
@@ -90,6 +74,27 @@ function OverviewTab({ ws }: { ws: JDWorkspace }) {
             </div>
           ))}
         </div>
+        {/* 关键词标签紧跟要求之后 */}
+        {jd.keywords.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-5">
+            {jd.keywords.map((k) => (
+              <span
+                key={k}
+                className="text-xs px-3 py-1 rounded-full bg-muted/70 text-muted-foreground border border-border/30"
+              >
+                {k}
+              </span>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ② AI 对 JD 的解读（概述、文化、注意事项） */}
+      <section>
+        <SectionTitle>AI 解读</SectionTitle>
+        <p className="text-[16px] text-muted-foreground leading-8 max-w-2xl">
+          {jd.summary}
+        </p>
       </section>
 
       {jd.culture_signals.length > 0 && (

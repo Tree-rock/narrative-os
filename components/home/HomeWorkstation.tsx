@@ -1252,7 +1252,7 @@ export function HomeWorkstation() {
               当前 Workspace
             </div>
             <Link
-              href="/workspaces"
+              href={currentWorkspace ? `/workspaces/${currentWorkspace.id}` : "/workspaces"}
               className="narrative-card p-4 block group hover:border-border transition-colors"
             >
               <div className="flex items-start justify-between gap-2">
