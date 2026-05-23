@@ -77,6 +77,16 @@ export function wsToggleExperience(id: string, expId: string): JDWorkspace | nul
   return wsUpdate(id, { activated_experience_ids: next })
 }
 
+export function wsToggleNarrative(id: string, narrativeId: string): JDWorkspace | null {
+  const ws = wsGet(id)
+  if (!ws) return null
+  const ids = ws.activated_narrative_ids ?? []
+  const next = ids.includes(narrativeId)
+    ? ids.filter((x) => x !== narrativeId)
+    : [...ids, narrativeId]
+  return wsUpdate(id, { activated_narrative_ids: next })
+}
+
 export function wsUpsertArtifact(
   id: string,
   type: ArtifactType,

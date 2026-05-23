@@ -7,6 +7,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { getSettings } from "@/lib/settings"
 import { localCreateExperience, localEnrichExperience, localGetExperiences, localUpdateExperience } from "@/lib/local-store"
+import { narrativeCreate } from "@/lib/narrative-store"
 import { wsGetVisible, wsUpdate } from "@/lib/workspace-store"
 import { activityAdd, activityRecent } from "@/lib/activity-store"
 import { chatLoad, chatSave, chatClear } from "@/lib/chat-store"
@@ -14,6 +15,7 @@ import { AddExperienceModal } from "@/components/experiences/AddExperienceModal"
 import { ResumeImportModal } from "@/components/home/ResumeImportModal"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import type { ChatMessage, ExperienceEntry, ExperienceSourceMessage, AISettings } from "@/types/experience"
+import type { NarrativeCategory } from "@/types/narrative"
 import type { JDWorkspace, WorkspaceStatus } from "@/types/workspace"
 
 const STATUS_META: Record<WorkspaceStatus, { label: string; dot: string; className: string }> = {
@@ -51,6 +53,40 @@ type PendingExtract = {
   sourceText: string
   assistantSummary?: string
   conversation: ExperienceSourceMessage[]
+}
+
+type PendingNarrative = {
+  title: string
+  story: string
+  category: NarrativeCategory
+  tags: string[]
+  sourceExcerpt: string
+}
+
+// ── 叙事辅助函数 ────────────────────────────────────────────
+function extractNarrativeTitle(story: string, fallback: string): string {
+  const heading = story.match(/^#{1,3}\s+(.+)/m)
+  if (heading) return heading[1].trim().slice(0, 40)
+  const bold = story.match(/\*\*([^*]{4,30})\*\*/)
+  if (bold) return bold[1].trim()
+  const first = story.split(/[。.！!？?\n]/)[0].trim()
+  if (first.length >= 4 && first.length <= 35) return first
+  return fallback.slice(0, 30) + (fallback.length > 30 ? "…" : "")
+}
+
+function extractNarrativeTags(story: string): string[] {
+  const hits = story.match(
+    /(跨团队|协作|领导|推动|沟通|冲突|决策|复盘|优化|数据|增长|用户|产品|运营|技术|架构|设计|实现|迭代|落地|创新|资源|优先级)/g
+  )
+  return Array.from(new Set(hits ?? [])).slice(0, 6)
+}
+
+function detectNarrativeCategory(text: string): NarrativeCategory {
+  const t = text.toLowerCase()
+  if (/(技术|代码|架构|算法|框架|工具|实现|方案|技术栈)/.test(t)) return "technical"
+  if (/(为什么|动机|兴趣|了解|文化|公司|选择|加入|吸引)/.test(t)) return "company"
+  if (/(如果|假设|遇到|处理|解决|情况|场景|面对|当.*发生)/.test(t)) return "situational"
+  return "behavioral"
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -211,6 +247,8 @@ export function HomeWorkstation() {
   const [pendingExtract, setPendingExtract] = useState<PendingExtract | null>(null)
   const [extracting, setExtracting] = useState(false)
   const [matchCandidate, setMatchCandidate] = useState<ExperienceEntry | null>(null)
+  const [pendingNarrative, setPendingNarrative] = useState<PendingNarrative | null>(null)
+  const [savingNarrative, setSavingNarrative] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -694,6 +732,30 @@ export function HomeWorkstation() {
     }
   }, [pendingExtract, matchCandidate])
 
+  // ── Confirm narrative: 将 AI 整理的面试叙事存入叙事库 ────────
+  function confirmNarrative() {
+    if (!pendingNarrative) return
+    setSavingNarrative(true)
+    try {
+      narrativeCreate({
+        title:          pendingNarrative.title,
+        story:          pendingNarrative.story,
+        category:       pendingNarrative.category,
+        tags:           pendingNarrative.tags,
+        source_excerpt: pendingNarrative.sourceExcerpt,
+      })
+      activityAdd({
+        type: "experience_saved",
+        title: `叙事入库：${pendingNarrative.title}`,
+        summary: pendingNarrative.story.slice(0, 120),
+      })
+      setToast(`✓ 「${pendingNarrative.title}」已存入叙事库`)
+    } finally {
+      setSavingNarrative(false)
+      setPendingNarrative(null)
+    }
+  }
+
   // ── Send message ────────────────────────────────────────────
   async function handleSend() {
     const text = input.trim()
@@ -821,6 +883,21 @@ export function HomeWorkstation() {
           sourceText: text,
           assistantSummary: cleanSummary,
           conversation: sourceConversation,
+        })
+      }
+
+      // 叙事检测：AI 整理出口语化面试故事时，提示存入叙事库
+      if (fullText.includes("[NARRATIVE_DETECTED]")) {
+        const cleanStory = fullText
+          .replace(/\[NARRATIVE_DETECTED\]/g, "")
+          .replace(/\[EXPERIENCE_DETECTED\]/g, "")
+          .trim()
+        setPendingNarrative({
+          title:         extractNarrativeTitle(cleanStory, text),
+          story:         cleanStory,
+          category:      detectNarrativeCategory(text + " " + cleanStory),
+          tags:          extractNarrativeTags(cleanStory),
+          sourceExcerpt: text,
         })
       }
     } catch (e) {
@@ -992,6 +1069,47 @@ export function HomeWorkstation() {
                     </div>
                   </div>
                 )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Narrative detection chip */}
+          <AnimatePresence>
+            {pendingNarrative && (
+              <motion.div
+                className="mx-8 mb-2"
+                initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-violet-500/5 border border-violet-500/20">
+                  <div className="flex items-center gap-2 text-xs text-foreground/80 min-w-0">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-violet-500/10 text-violet-600">
+                      <Sparkles className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    </span>
+                    <span className="truncate">
+                      整理出一段叙事：「{pendingNarrative.title}」
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => setPendingNarrative(null)}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      忽略
+                    </button>
+                    <button
+                      onClick={confirmNarrative}
+                      disabled={savingNarrative}
+                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:opacity-90 transition-opacity disabled:opacity-60"
+                    >
+                      {savingNarrative ? "存入中…" : (
+                        <>存入叙事库<ChevronRight className="h-3 w-3" strokeWidth={1.8} /></>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
