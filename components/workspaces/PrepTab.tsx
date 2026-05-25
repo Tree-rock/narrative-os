@@ -2,11 +2,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Pin, Trash2, BookOpen, Eye, X, Check, ExternalLink } from "lucide-react"
+import { Pencil, Trash2, BookOpen, Eye, X, Check, ExternalLink } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { narrativeGetAll, narrativeDelete } from "@/lib/narrative-store"
+import { narrativeGetAll, narrativeUpdate, narrativeDelete } from "@/lib/narrative-store"
 import { wsToggleNarrative } from "@/lib/workspace-store"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import type { JDWorkspace } from "@/types/workspace"
@@ -104,14 +104,34 @@ function NarrativeCard({
   narrative,
   activated,
   onToggle,
+  onSaved,
   onDelete,
 }: {
   narrative: NarrativeEntry
   activated: boolean
   onToggle: () => void
+  onSaved: (updated: NarrativeEntry) => void
   onDelete: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState(narrative.title)
+  const [editStory, setEditStory] = useState(narrative.story)
+
+  function handleSave() {
+    const updated = narrativeUpdate(narrative.id, {
+      title: editTitle.trim() || narrative.title,
+      story: editStory.trim() || narrative.story,
+    })
+    if (updated) onSaved(updated)
+    setEditing(false)
+  }
+
+  function handleCancelEdit() {
+    setEditTitle(narrative.title)
+    setEditStory(narrative.story)
+    setEditing(false)
+  }
 
   return (
     <motion.div
@@ -140,50 +160,102 @@ function NarrativeCard({
           </button>
 
           {/* Content */}
-          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setExpanded((v) => !v)}>
-            <div className="flex items-start justify-between gap-2">
-              <span className="text-sm font-medium text-foreground leading-snug">
-                {narrative.title}
-              </span>
-              <button
-                onClick={(e) => { e.stopPropagation(); onDelete() }}
-                className="shrink-0 p-1 rounded-md text-muted-foreground/30 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                title="删除"
-              >
-                <Trash2 className="w-3 h-3" strokeWidth={1.5} />
-              </button>
-            </div>
-            <div className="flex items-center gap-2 mt-1.5">
-              <span className={cn("text-[10px] px-2 py-0.5 rounded-full border", CATEGORY_COLORS[narrative.category])}>
-                {CATEGORY_LABELS[narrative.category]}
-              </span>
-              {narrative.tags.slice(0, 3).map((tag) => (
-                <span key={tag} className="text-[10px] text-muted-foreground/50">#{tag}</span>
-              ))}
-              <span className="text-[10px] text-muted-foreground/40 ml-auto">
-                {expanded ? "收起" : "展开"}
-              </span>
-            </div>
+          <div className="flex-1 min-w-0">
+            {editing ? (
+              /* ── 编辑模式 ── */
+              <div className="space-y-2">
+                <input
+                  autoFocus
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full text-sm font-medium bg-muted/40 border border-border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring/30"
+                  placeholder="叙事标题"
+                />
+                <textarea
+                  value={editStory}
+                  onChange={(e) => setEditStory(e.target.value)}
+                  rows={6}
+                  className="w-full text-sm bg-muted/40 border border-border rounded-lg px-3 py-2 resize-y focus:outline-none focus:ring-1 focus:ring-ring/30 leading-relaxed"
+                  placeholder="叙事正文（支持 Markdown）"
+                />
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    onClick={handleCancelEdit}
+                    className="text-xs px-3 py-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-foreground text-background hover:opacity-80 transition-opacity"
+                  >
+                    保存
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* ── 阅读模式 ── */
+              <>
+                <div className="flex items-start justify-between gap-2">
+                  <span
+                    className="text-sm font-medium text-foreground leading-snug cursor-pointer flex-1"
+                    onClick={() => setExpanded((v) => !v)}
+                  >
+                    {narrative.title}
+                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => { setEditing(true); setExpanded(true) }}
+                      className="p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted/60 transition-colors"
+                      title="编辑"
+                    >
+                      <Pencil className="w-3 h-3" strokeWidth={1.5} />
+                    </button>
+                    <button
+                      onClick={onDelete}
+                      className="p-1 rounded-md text-muted-foreground/30 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      title="删除"
+                    >
+                      <Trash2 className="w-3 h-3" strokeWidth={1.5} />
+                    </button>
+                  </div>
+                </div>
+                <div
+                  className="flex items-center gap-2 mt-1.5 cursor-pointer"
+                  onClick={() => setExpanded((v) => !v)}
+                >
+                  <span className={cn("text-[10px] px-2 py-0.5 rounded-full border", CATEGORY_COLORS[narrative.category])}>
+                    {CATEGORY_LABELS[narrative.category]}
+                  </span>
+                  {narrative.tags.slice(0, 3).map((tag) => (
+                    <span key={tag} className="text-[10px] text-muted-foreground/50">#{tag}</span>
+                  ))}
+                  <span className="text-[10px] text-muted-foreground/40 ml-auto">
+                    {expanded ? "收起" : "展开"}
+                  </span>
+                </div>
+
+                {/* Expandable story */}
+                <AnimatePresence initial={false}>
+                  {expanded && (
+                    <motion.div
+                      key="story"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="mt-3 pt-3 border-t border-border/30 text-sm text-foreground/85 leading-relaxed">
+                        <MarkdownContent compact>{narrative.story}</MarkdownContent>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
+            )}
           </div>
         </div>
-
-        {/* Expandable story */}
-        <AnimatePresence initial={false}>
-          {expanded && (
-            <motion.div
-              key="story"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
-            >
-              <div className="mt-3 ml-8 pl-0 pt-3 border-t border-border/30 text-sm text-foreground/85 leading-relaxed">
-                <MarkdownContent compact>{narrative.story}</MarkdownContent>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </motion.div>
   )
@@ -214,6 +286,10 @@ export function PrepTab({
   function handleToggle(narrativeId: string) {
     const updated = wsToggleNarrative(wsState.id, narrativeId)
     if (updated) setWsState(updated)
+  }
+
+  function handleSaved(updated: NarrativeEntry) {
+    setNarratives((prev) => prev.map((n) => (n.id === updated.id ? updated : n)))
   }
 
   function handleDelete(narrativeId: string) {
@@ -321,6 +397,7 @@ export function PrepTab({
                   narrative={n}
                   activated={activatedIds.has(n.id)}
                   onToggle={() => handleToggle(n.id)}
+                  onSaved={handleSaved}
                   onDelete={() => handleDelete(n.id)}
                 />
               ))}
