@@ -20,6 +20,9 @@ function readAll(): JDWorkspace[] {
 
 function writeAll(items: JDWorkspace[]) {
   localStorage.setItem(KEY, JSON.stringify(items))
+  void import("@/lib/cloud-sync")
+    .then(({ scheduleCloudBackup }) => scheduleCloudBackup())
+    .catch(() => {})
 }
 
 export function wsGetAll(): JDWorkspace[] {

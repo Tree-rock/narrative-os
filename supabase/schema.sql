@@ -15,6 +15,15 @@ create table if not exists user_profiles (
   updated_at   timestamptz default now()
 );
 
+-- ─── 客户端数据云端备份（localStorage ↔ Supabase JSON）──────────────
+create table if not exists user_data_blobs (
+  user_id    uuid references auth.users(id) on delete cascade not null,
+  key        text not null,
+  payload    jsonb not null default '[]'::jsonb,
+  updated_at timestamptz default now(),
+  primary key (user_id, key)
+);
+
 -- ─── 经历条目（核心底座）────────────────────────────────────
 create table if not exists experience_entries (
   id           uuid primary key default gen_random_uuid(),
@@ -159,6 +168,7 @@ create index if not exists idx_chat_user_workspace
 
 -- ─── Row Level Security ──────────────────────────────────────
 alter table user_profiles       enable row level security;
+alter table user_data_blobs      enable row level security;
 alter table experience_entries  enable row level security;
 alter table jd_workspaces       enable row level security;
 alter table workspace_experiences enable row level security;
@@ -169,6 +179,10 @@ alter table chat_messages       enable row level security;
 -- 用户只能访问自己的数据
 create policy "user_profiles_self" on user_profiles
   for all using (auth.uid() = id);
+
+create policy "user_data_blobs_self" on user_data_blobs
+  for all using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 create policy "experience_entries_self" on experience_entries
   for all using (auth.uid() = user_id);

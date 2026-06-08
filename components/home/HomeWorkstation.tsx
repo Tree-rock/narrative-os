@@ -175,6 +175,20 @@ export function HomeWorkstation() {
     setChatLoaded(true)
   }, [])
 
+  useEffect(() => {
+    function handleCloudSynced() {
+      const loadedExperiences = localGetExperiences()
+      setAllExperiences(loadedExperiences)
+      setExperiences(loadedExperiences.slice(0, 5))
+      setWorkspaces(wsGetVisible())
+      const saved = chatLoad()
+      setMessages(saved.length > 0 ? [WELCOME, ...saved] : [WELCOME])
+    }
+
+    window.addEventListener("narrative-cloud-synced", handleCloudSynced)
+    return () => window.removeEventListener("narrative-cloud-synced", handleCloudSynced)
+  }, [])
+
   // ── Persist chat whenever messages change (after initial load)
   useEffect(() => {
     if (!chatLoaded) return

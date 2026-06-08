@@ -32,6 +32,9 @@ export function chatSave(messages: ChatMessage[]): void {
     .slice(-MAX_STORED)
     .map((m) => ({ ...m, createdAt: m.createdAt.toISOString() }))
   localStorage.setItem(KEY, JSON.stringify(toStore))
+  void import("@/lib/cloud-sync")
+    .then(({ scheduleCloudBackup }) => scheduleCloudBackup())
+    .catch(() => {})
 }
 
 export function chatClear(): void {

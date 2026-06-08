@@ -21,6 +21,9 @@ function readAll(): ExperienceEntry[] {
 
 function writeAll(entries: ExperienceEntry[]) {
   localStorage.setItem(KEY, JSON.stringify(entries))
+  void import("@/lib/cloud-sync")
+    .then(({ scheduleCloudBackup }) => scheduleCloudBackup())
+    .catch(() => {})
 }
 
 export function localGetExperiences(): ExperienceEntry[] {

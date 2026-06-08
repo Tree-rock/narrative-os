@@ -36,6 +36,9 @@ function readAll(): ActivityEntry[] {
 
 function writeAll(items: ActivityEntry[]) {
   localStorage.setItem(KEY, JSON.stringify(items.slice(-MAX_STORED)))
+  void import("@/lib/cloud-sync")
+    .then(({ scheduleCloudBackup }) => scheduleCloudBackup())
+    .catch(() => {})
 }
 
 export function activityAdd(
