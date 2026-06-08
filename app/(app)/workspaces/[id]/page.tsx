@@ -3,18 +3,23 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Sparkles, Check, Loader2, Copy, RotateCcw } from "lucide-react"
+import { ArrowLeft, Sparkles, Check, Loader2, Copy, RotateCcw, LayoutGrid, BookMarked } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { wsGet, wsToggleExperience, wsUpsertArtifact } from "@/lib/workspace-store"
 import { localGetExperiences } from "@/lib/local-store"
+import { appGetAll } from "@/lib/application-store"
 import { getSettings } from "@/lib/settings"
+import { LinkApplicationModal } from "@/components/applications/LinkApplicationModal"
+import { PrepTab } from "@/components/workspaces/PrepTab"
 import type { JDWorkspace, ArtifactType, WorkspaceStatus } from "@/types/workspace"
 import type { ExperienceEntry } from "@/types/experience"
+import type { ApplicationEntry } from "@/types/application"
 
 // ─── Tab types ────────────────────────────────────────────────
-type Tab = "overview" | "experiences" | "artifacts"
+type Tab = "overview" | "experiences" | "artifacts" | "prep"
 
 const STATUS_META: Record<WorkspaceStatus, { label: string; className: string }> = {
   active: {
@@ -56,23 +61,7 @@ function OverviewTab({ ws }: { ws: JDWorkspace }) {
 
   return (
     <div className="max-w-3xl space-y-10">
-      <section>
-        <SectionTitle>职位概述</SectionTitle>
-        <p className="text-[17px] text-foreground leading-8 max-w-2xl">
-          {jd.summary}
-        </p>
-        <div className="flex flex-wrap gap-2 mt-5">
-          {jd.keywords.map((k) => (
-            <span
-              key={k}
-              className="text-xs px-3 py-1 rounded-full bg-muted/70 text-muted-foreground border border-border/30"
-            >
-              {k}
-            </span>
-          ))}
-        </div>
-      </section>
-
+      {/* ① 精准 JD 要求（原文级，置顶） */}
       <section>
         <SectionTitle>关键要求</SectionTitle>
         <div className="space-y-3">
@@ -85,6 +74,27 @@ function OverviewTab({ ws }: { ws: JDWorkspace }) {
             </div>
           ))}
         </div>
+        {/* 关键词标签紧跟要求之后 */}
+        {jd.keywords.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-5">
+            {jd.keywords.map((k) => (
+              <span
+                key={k}
+                className="text-xs px-3 py-1 rounded-full bg-muted/70 text-muted-foreground border border-border/30"
+              >
+                {k}
+              </span>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ② AI 对 JD 的解读（概述、文化、注意事项） */}
+      <section>
+        <SectionTitle>AI 解读</SectionTitle>
+        <p className="text-[16px] text-muted-foreground leading-8 max-w-2xl">
+          {jd.summary}
+        </p>
       </section>
 
       {jd.culture_signals.length > 0 && (
@@ -445,12 +455,15 @@ export default function WorkspaceDetailPage() {
   const [ws, setWs] = useState<JDWorkspace | null>(null)
   const [allExps, setAllExps] = useState<ExperienceEntry[]>([])
   const [tab, setTab] = useState<Tab>("overview")
+  const [showLinkModal, setShowLinkModal] = useState(false)
+  const [linkedApp, setLinkedApp] = useState<ApplicationEntry | null>(null)
 
   useEffect(() => {
     const found = wsGet(id)
     if (!found) { router.replace("/workspaces"); return }
     setWs(found)
     setAllExps(localGetExperiences())
+    setLinkedApp(appGetAll().find((a) => a.workspace_id === id) ?? null)
   }, [id, router])
 
   function handleToggleExp(expId: string) {
@@ -478,10 +491,11 @@ export default function WorkspaceDetailPage() {
     { id: "overview",     label: "概览" },
     { id: "experiences",  label: "经历激活", badge: ws.activated_experience_ids.length || undefined },
     { id: "artifacts",    label: "生成产物", badge: ws.artifacts.length || undefined },
+    { id: "prep",         label: "叙事准备" },
   ]
 
   return (
-    <div className="max-w-4xl mx-auto px-8 py-8">
+    <div className={cn("mx-auto px-8 py-8", tab === "prep" ? "max-w-6xl" : "max-w-4xl")}>
       {/* Back + Header */}
       <div className="mb-8">
         <button
@@ -500,9 +514,28 @@ export default function WorkspaceDetailPage() {
               <p className="text-sm text-muted-foreground mt-1">{ws.company}</p>
             )}
           </div>
-          <span className={cn("text-[11px] px-2.5 py-1 rounded-full border shrink-0 mt-1", statusMeta.className)}>
-            {statusMeta.label}
-          </span>
+          <div className="flex items-center gap-2 shrink-0 mt-1">
+            <span className={cn("text-[11px] px-2.5 py-1 rounded-full border", statusMeta.className)}>
+              {statusMeta.label}
+            </span>
+            {linkedApp ? (
+              <Link
+                href="/applications"
+                className="flex items-center gap-1.5 text-xs text-primary hover:opacity-70 transition-opacity px-2.5 py-1 rounded-full border border-primary/30 bg-primary/5"
+              >
+                <LayoutGrid className="w-3 h-3" strokeWidth={1.5} />
+                查看追踪
+              </Link>
+            ) : (
+              <button
+                onClick={() => setShowLinkModal(true)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2.5 py-1 rounded-full border border-border/60 hover:border-border transition-all"
+              >
+                <LayoutGrid className="w-3 h-3" strokeWidth={1.5} />
+                追踪投递
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -543,6 +576,19 @@ export default function WorkspaceDetailPage() {
         ))}
       </div>
 
+      {/* Link Application Modal */}
+      <AnimatePresence>
+        {showLinkModal && (
+          <LinkApplicationModal
+            workspace={ws}
+            onClose={() => setShowLinkModal(false)}
+            onSaved={() => {
+              setLinkedApp(appGetAll().find((a) => a.workspace_id === id) ?? null)
+            }}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Tab Content */}
       <AnimatePresence mode="wait">
         <motion.div
@@ -551,6 +597,7 @@ export default function WorkspaceDetailPage() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
           transition={{ duration: 0.15 }}
+          className={tab === "prep" ? "h-[calc(100vh-260px)] min-h-[520px]" : undefined}
         >
           {tab === "overview" && <OverviewTab ws={ws} />}
           {tab === "experiences" && (
@@ -562,6 +609,11 @@ export default function WorkspaceDetailPage() {
               activatedExps={activatedExps}
               onArtifactSaved={handleArtifactSaved}
             />
+          )}
+          {tab === "prep" && (
+            <div className="h-full border border-border/40 rounded-2xl overflow-hidden bg-card">
+              <PrepTab ws={ws} activatedExps={activatedExps} />
+            </div>
           )}
         </motion.div>
       </AnimatePresence>

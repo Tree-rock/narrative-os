@@ -28,6 +28,7 @@ export interface JDWorkspace {
   jd_text: string
   parsed_jd?: ParsedJD
   activated_experience_ids: string[]
+  activated_narrative_ids?: string[]   // 为本次面试激活的叙事条目
   artifacts: WorkspaceArtifact[]
   status: WorkspaceStatus
   locked?: boolean
